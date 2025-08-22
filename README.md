@@ -31,22 +31,22 @@ Pathoria follows **Clean Architecture** principles with a modern Flutter stack:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    PRESENTATION LAYER                      │
+│                    PRESENTATION LAYER                       │
 ├─────────────────────────────────────────────────────────────┤
-│  Screens │ Widgets │ Providers (Riverpod) │ Navigation    │
+│  Screens │ Widgets │ Providers (Riverpod) │ Navigation      │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     DOMAIN LAYER                           │
+│                     DOMAIN LAYER                            │
 ├─────────────────────────────────────────────────────────────┤
-│  Entities │ Use Cases │ Repository Interfaces │ Business   │
-│           │           │                       │  Logic     │
+│  Entities │ Use Cases │ Repository Interfaces │ Business    │
+│           │           │                       │  Logic      │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      DATA LAYER                            │
+│                      DATA LAYER                             │
 ├─────────────────────────────────────────────────────────────┤
 │  Models │ Repositories │ Services │ Data Sources │ External │
 │         │              │          │              │ APIs     │
@@ -54,9 +54,9 @@ Pathoria follows **Clean Architecture** principles with a modern Flutter stack:
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      CORE LAYER                            │
+│                      CORE LAYER                             │
 ├─────────────────────────────────────────────────────────────┤
-│  Config │ Utils │ Error Handling │ Constants │ Theme      │
+│  Config │ Utils │ Error Handling │ Constants │ Theme        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -84,7 +84,7 @@ Pathoria follows **Clean Architecture** principles with a modern Flutter stack:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/pathoria.git
+   git clone https://github.com/YKbodgam/pathoria.git
    cd pathoria
    ```
 
@@ -278,13 +278,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/pathoria/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/pathoria/discussions)
-- **Wiki**: [Project Wiki](https://github.com/yourusername/pathoria/wiki)
+- **Issues**: [GitHub Issues](https://github.com/YKbodgam/pathoria/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/YKbodgam/pathoria/discussions)
+- **Wiki**: [Project Wiki](https://github.com/YKbodgam/pathoria/wiki)
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/pathoria&type=Date)](https://star-history.com/#yourusername/pathoria&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=YKbodgam/pathoria&type=Date)](https://star-history.com/#YKbodgam/pathoria&Date)
 
 ---
 
