@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'src/core/config/app_config.dart';
 
 void main() async {
   // Ensure Flutter engine is initialized before any async code
@@ -16,8 +19,11 @@ void main() async {
   // Load environment variables from .env file
   await dotenv.load();
 
-  // Initialize Hive and open required box
-  await Hive.initFlutter();
+  // Initialize Firebase
+  await Firebase.initializeApp();
+
+  // Initialize app configuration
+  await AppConfig.initialize();
 
   // Lock orientation to portrait only
   await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
@@ -27,5 +33,5 @@ void main() async {
   // Remove splash and launch the app
   FlutterNativeSplash.remove();
 
-  runApp(MyApp());
+  runApp(ProviderScope(child: MyApp()));
 }

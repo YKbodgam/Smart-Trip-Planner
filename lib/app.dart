@@ -1,27 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import 'src/app/routes/app_pages.dart';
+import 'src/core/router/app_router.dart';
 import 'src/core/theme/app_theme.dart';
+import 'src/core/utils/screen_util_helper.dart';
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   // Initialize controller
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(appRouterProvider);
+
     return ScreenUtilInit(
-      designSize: Size(390, 844), // iPhone 12 base
+      designSize: ScreenUtilHelper.designSize,
       minTextAdapt: true,
       splitScreenMode: true,
-      builder: (_, _) => MaterialApp(
-        title: "Peece",
-        locale: Locale('en', 'US'),
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightThemeData,
-        themeMode: ThemeMode.light,
-        initialRoute: Routes.SPLASH,
-      ),
+      builder: (context, child) {
+        return MaterialApp.router(
+          title: 'Smart Trip Planner',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeMode.system,
+          routerConfig: router,
+        );
+      },
     );
   }
 }
