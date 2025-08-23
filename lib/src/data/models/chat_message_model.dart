@@ -1,38 +1,44 @@
-import 'package:equatable/equatable.dart';
-import 'package:isar/isar.dart';
+import 'package:hive/hive.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/chat_message.dart';
+import '../../domain/entities/chat_message.dart' as domain;
 
 part 'chat_message_model.g.dart';
 
 @JsonSerializable()
-@collection
+@HiveType(typeId: 5)
 class ChatMessageModel extends Equatable {
-  Id id = Isar.autoIncrement; // ✅ mutable, Isar requires non-final
+  @HiveField(0)
+  final String id;
 
+  @HiveField(1)
   @JsonKey(name: 'itineraryId')
-  @Index()
-  int? itineraryId;
+  final String? itineraryId;
 
+  @HiveField(2)
   @JsonKey(name: 'content')
-  late String content;
+  final String content;
 
+  @HiveField(3)
   @JsonKey(name: 'isUser')
-  late bool isUser;
+  final bool isUser;
 
+  @HiveField(4)
   @JsonKey(name: 'timestamp')
-  late DateTime timestamp;
+  final DateTime timestamp;
 
+  @HiveField(5)
   @JsonKey(name: 'messageType')
-  @Enumerated(EnumType.name)
-  late MessageType messageType;
+  final MessageType messageType;
 
+  @HiveField(6)
   @JsonKey(name: 'metadata')
-  MessageMetadataModel? metadata;
+  final MessageMetadataModel? metadata;
 
-  ChatMessageModel({
-    this.id = Isar.autoIncrement,
+  const ChatMessageModel({
+    required this.id,
     this.itineraryId,
     required this.content,
     required this.isUser,
@@ -46,35 +52,59 @@ class ChatMessageModel extends Equatable {
 
   Map<String, dynamic> toJson() => _$ChatMessageModelToJson(this);
 
+  // ✅ Convert from domain entity
   factory ChatMessageModel.fromEntity(ChatMessage entity) {
     return ChatMessageModel(
-      id: entity.id ?? Isar.autoIncrement,
+      id: entity.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
       itineraryId: entity.itineraryId,
       content: entity.content,
       isUser: entity.isUser,
       timestamp: entity.timestamp,
-      messageType: entity.messageType,
+      messageType: _mapDomainMessageType(entity.messageType),
       metadata: entity.metadata != null
           ? MessageMetadataModel.fromEntity(entity.metadata!)
           : null,
     );
   }
 
+  static MessageType _mapDomainMessageType(dynamic domainType) {
+    if (domainType == null) return MessageType.text;
+    return MessageType.values.firstWhere(
+      (e) => e.name == domainType.toString().split('.').last,
+      orElse: () => MessageType.text,
+    );
+  }
+
   ChatMessage toEntity() {
     return ChatMessage(
-      id: id == Isar.autoIncrement ? null : id,
+      id: id,
       itineraryId: itineraryId,
       content: content,
       isUser: isUser,
       timestamp: timestamp,
-      messageType: messageType,
+      messageType: _mapModelMessageTypeToDomain(messageType),
       metadata: metadata?.toEntity(),
     );
   }
 
+  static domain.MessageType _mapModelMessageTypeToDomain(
+    MessageType modelType,
+  ) {
+    switch (modelType) {
+      case MessageType.text:
+        return domain.MessageType.text;
+      case MessageType.itinerary:
+        return domain.MessageType.itinerary;
+      case MessageType.error:
+        return domain.MessageType.error;
+      case MessageType.loading:
+        return domain.MessageType.loading;
+    }
+  }
+
   ChatMessageModel copyWith({
-    Id? id,
-    int? itineraryId,
+    String? id,
+    String? itineraryId,
     String? content,
     bool? isUser,
     DateTime? timestamp,
@@ -92,7 +122,6 @@ class ChatMessageModel extends Equatable {
     );
   }
 
-  @ignore // 👈 prevents Isar from trying to store this
   @override
   List<Object?> get props => [
     id,
@@ -106,24 +135,29 @@ class ChatMessageModel extends Equatable {
 }
 
 @JsonSerializable()
-@embedded // ✅ lowercase
+@HiveType(typeId: 6)
 class MessageMetadataModel extends Equatable {
+  @HiveField(0)
   @JsonKey(name: 'tokensUsed')
-  int? tokensUsed;
+  final int? tokensUsed;
 
+  @HiveField(1)
   @JsonKey(name: 'cost')
-  double? cost;
+  final double? cost;
 
+  @HiveField(2)
   @JsonKey(name: 'processingTime')
-  int? processingTime;
+  final int? processingTime;
 
+  @HiveField(3)
   @JsonKey(name: 'model')
-  String? model;
+  final String? model;
 
+  @HiveField(4)
   @JsonKey(name: 'error')
-  String? error;
+  final String? error;
 
-  MessageMetadataModel({
+  const MessageMetadataModel({
     this.tokensUsed,
     this.cost,
     this.processingTime,
@@ -156,7 +190,22 @@ class MessageMetadataModel extends Equatable {
     );
   }
 
-  @ignore // 👈 prevents Isar from trying to store this
   @override
   List<Object?> get props => [tokensUsed, cost, processingTime, model, error];
+}
+
+@HiveType(typeId: 7)
+@JsonEnum(alwaysCreate: true) // ✅ ensures json_serializable generates mapping
+enum MessageType {
+  @HiveField(0)
+  text,
+
+  @HiveField(1)
+  itinerary,
+
+  @HiveField(2)
+  error,
+
+  @HiveField(3)
+  loading,
 }

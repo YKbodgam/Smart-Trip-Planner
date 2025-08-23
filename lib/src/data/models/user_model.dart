@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:hive/hive.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
 
@@ -7,43 +7,53 @@ import '../../domain/entities/user.dart';
 part 'user_model.g.dart';
 
 @JsonSerializable()
-@collection
+@HiveType(typeId: 3) // Replaced Isar Collection with Hive HiveType
 class UserModel extends Equatable {
-  Id id = Isar.autoIncrement; // ✅ mutable, Isar requires non-final
+  @HiveField(0) // Replaced Isar Id with Hive HiveField
+  final String id;
 
+  @HiveField(1)
   @JsonKey(name: 'uid')
-  @Index(unique: true)
   final String uid;
 
+  @HiveField(2)
   @JsonKey(name: 'email')
   final String email;
 
+  @HiveField(3)
   @JsonKey(name: 'displayName')
   final String? displayName;
 
+  @HiveField(4)
   @JsonKey(name: 'photoUrl')
   final String? photoUrl;
 
+  @HiveField(5)
   @JsonKey(name: 'createdAt')
   final DateTime createdAt;
 
+  @HiveField(6)
   @JsonKey(name: 'updatedAt')
   final DateTime updatedAt;
 
+  @HiveField(7)
   @JsonKey(name: 'requestTokensUsed')
   final int requestTokensUsed;
 
+  @HiveField(8)
   @JsonKey(name: 'responseTokensUsed')
   final int responseTokensUsed;
 
+  @HiveField(9)
   @JsonKey(name: 'totalCost')
   final double totalCost;
 
+  @HiveField(10)
   @JsonKey(name: 'preferences')
   final UserPreferencesModel? preferences;
 
-  UserModel({
-    this.id = Isar.autoIncrement,
+  const UserModel({
+    required this.id, // Changed from auto-increment to required String id
     required this.uid,
     required this.email,
     this.displayName,
@@ -63,7 +73,10 @@ class UserModel extends Equatable {
 
   factory UserModel.fromEntity(User entity) {
     return UserModel(
-      id: entity.id ?? Isar.autoIncrement,
+      id:
+          entity.id ??
+          DateTime.now().millisecondsSinceEpoch
+              .toString(), // Generate string ID if null
       uid: entity.uid,
       email: entity.email,
       displayName: entity.displayName,
@@ -81,7 +94,7 @@ class UserModel extends Equatable {
 
   User toEntity() {
     return User(
-      id: id == Isar.autoIncrement ? null : id,
+      id: id,
       uid: uid,
       email: email,
       displayName: displayName,
@@ -96,7 +109,7 @@ class UserModel extends Equatable {
   }
 
   UserModel copyWith({
-    Id? id,
+    String? id,
     String? uid,
     String? email,
     String? displayName,
@@ -123,7 +136,6 @@ class UserModel extends Equatable {
     );
   }
 
-  @ignore // 👈 prevents Isar from trying to store this
   @override
   List<Object?> get props => [
     id,
@@ -141,20 +153,25 @@ class UserModel extends Equatable {
 }
 
 @JsonSerializable()
-@embedded
+@HiveType(typeId: 4) // Added Hive type annotation
 class UserPreferencesModel extends Equatable {
+  @HiveField(0)
   @JsonKey(name: 'currency')
   final String currency;
 
+  @HiveField(1)
   @JsonKey(name: 'language')
   final String language;
 
+  @HiveField(2)
   @JsonKey(name: 'budgetRange')
   final String budgetRange;
 
+  @HiveField(3)
   @JsonKey(name: 'travelStyle')
   final String travelStyle;
 
+  @HiveField(4)
   @JsonKey(name: 'interests')
   final List<String> interests;
 
@@ -191,7 +208,6 @@ class UserPreferencesModel extends Equatable {
     );
   }
 
-  @ignore // 👈 prevents Isar from trying to store this
   @override
   List<Object?> get props => [
     currency,

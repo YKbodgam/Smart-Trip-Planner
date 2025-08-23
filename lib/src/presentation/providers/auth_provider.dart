@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../domain/entities/user.dart';
@@ -16,7 +15,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final UserRepository _userRepository;
   final firebase_auth.FirebaseAuth _firebaseAuth =
       firebase_auth.FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   AuthNotifier(this._userRepository) : super(const AuthState.initial()) {
     _checkAuthState();
@@ -99,7 +98,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState.loading();
 
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await _googleSignIn
+          .authenticate();
       if (googleUser == null) {
         state = const AuthState.unauthenticated();
         return;
@@ -108,7 +108,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
       final credential = firebase_auth.GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 

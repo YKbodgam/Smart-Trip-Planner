@@ -1,7 +1,6 @@
 import 'package:dartz/dartz.dart';
-import 'package:isar/isar.dart';
 
-import '../../core/config/app_config.dart';
+import '../../core/database/hive_service.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/error/failures.dart';
 import '../../domain/entities/itinerary.dart';
@@ -9,15 +8,20 @@ import '../../domain/repositories/itinerary_repository.dart';
 import '../models/itinerary_model.dart';
 
 class ItineraryRepositoryImpl implements ItineraryRepository {
-  final Isar _isar;
+  final HiveService _hiveService;
 
-  ItineraryRepositoryImpl({Isar? isar}) : _isar = isar ?? AppConfig.isar;
+  ItineraryRepositoryImpl({HiveService? hiveService})
+    : _hiveService = hiveService ?? HiveService.instance;
 
   @override
   Future<Either<Failure, List<Itinerary>>> getAllItineraries() async {
     try {
-      final itineraryModels = await _isar.itineraryModels.where().findAll();
-      final itineraries = itineraryModels.map((model) => model.toEntity()).toList();
+      final itineraryModels = _hiveService.itinerariesBox.values.toList();
+      final itineraries = itineraryModels
+          .map((model) => model.toEntity())
+          .toList();
+      // Sort by creation date, newest first
+      itineraries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return Right(itineraries);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -29,7 +33,7 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   @override
   Future<Either<Failure, Itinerary?>> getItineraryById(int id) async {
     try {
-      final itineraryModel = await _isar.itineraryModels.get(id);
+      final itineraryModel = _hiveService.itinerariesBox.get(id);
       if (itineraryModel == null) {
         return const Right(null);
       }
@@ -45,9 +49,7 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   Future<Either<Failure, Itinerary>> saveItinerary(Itinerary itinerary) async {
     try {
       final itineraryModel = ItineraryModel.fromEntity(itinerary);
-      await _isar.writeTxn(() async {
-        await _isar.itineraryModels.put(itineraryModel);
-      });
+      await _hiveService.itinerariesBox.put(itineraryModel.id, itineraryModel);
       return Right(itineraryModel.toEntity());
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -57,11 +59,9 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteItinerary(int id) async {
+  Future<Either<Failure, void>> deleteItinerary(int? id) async {
     try {
-      await _isar.writeTxn(() async {
-        await _isar.itineraryModels.delete(id);
-      });
+      await _hiveService.itinerariesBox.delete(id);
       return const Right(null);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -71,13 +71,13 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   }
 
   @override
-  Future<Either<Failure, Itinerary>> updateItinerary(Itinerary itinerary) async {
+  Future<Either<Failure, Itinerary>> updateItinerary(
+    Itinerary itinerary,
+  ) async {
     try {
       final updatedItinerary = itinerary.copyWith(updatedAt: DateTime.now());
       final itineraryModel = ItineraryModel.fromEntity(updatedItinerary);
-      await _isar.writeTxn(() async {
-        await _isar.itineraryModels.put(itineraryModel);
-      });
+      await _hiveService.itinerariesBox.put(itineraryModel.id, itineraryModel);
       return Right(itineraryModel.toEntity());
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -89,11 +89,14 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   @override
   Future<Either<Failure, List<Itinerary>>> getOfflineItineraries() async {
     try {
-      final itineraryModels = await _isar.itineraryModels
-          .where()
-          .isOfflineAvailableEqualTo(true)
-          .findAll();
-      final itineraries = itineraryModels.map((model) => model.toEntity()).toList();
+      final itineraryModels = _hiveService.itinerariesBox.values
+          .where((model) => model.isOfflineAvailable)
+          .toList();
+      final itineraries = itineraryModels
+          .map((model) => model.toEntity())
+          .toList();
+      // Sort by creation date, newest first
+      itineraries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return Right(itineraries);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -103,15 +106,13 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   }
 
   @override
-  Future<Either<Failure, void>> markItineraryOffline(int id) async {
+  Future<Either<Failure, void>> markItineraryOffline(int? id) async {
     try {
-      await _isar.writeTxn(() async {
-        final itinerary = await _isar.itineraryModels.get(id);
-        if (itinerary != null) {
-          final updatedItinerary = itinerary.copyWith(isOfflineAvailable: true);
-          await _isar.itineraryModels.put(updatedItinerary);
-        }
-      });
+      final itinerary = _hiveService.itinerariesBox.get(id);
+      if (itinerary != null) {
+        final updatedItinerary = itinerary.copyWith(isOfflineAvailable: true);
+        await _hiveService.itinerariesBox.put(id, updatedItinerary);
+      }
       return const Right(null);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -123,9 +124,7 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   @override
   Future<Either<Failure, void>> clearCache() async {
     try {
-      await _isar.writeTxn(() async {
-        await _isar.itineraryModels.clear();
-      });
+      await _hiveService.itinerariesBox.clear();
       return const Right(null);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));

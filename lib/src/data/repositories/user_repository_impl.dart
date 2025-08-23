@@ -1,7 +1,6 @@
 import 'package:dartz/dartz.dart';
-import 'package:isar/isar.dart';
 
-import '../../core/config/app_config.dart';
+import '../../core/database/hive_service.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/error/failures.dart';
 import '../../domain/entities/user.dart';
@@ -9,14 +8,15 @@ import '../../domain/repositories/user_repository.dart';
 import '../models/user_model.dart';
 
 class UserRepositoryImpl implements UserRepository {
-  final Isar _isar;
+  final HiveService _hiveService;
 
-  UserRepositoryImpl({Isar? isar}) : _isar = isar ?? AppConfig.isar;
+  UserRepositoryImpl({HiveService? hiveService})
+    : _hiveService = hiveService ?? HiveService.instance;
 
   @override
   Future<Either<Failure, User?>> getCurrentUser() async {
     try {
-      final userModels = await _isar.userModels.where().findAll();
+      final userModels = _hiveService.usersBox.values.toList();
       if (userModels.isEmpty) {
         return const Right(null);
       }
@@ -32,9 +32,7 @@ class UserRepositoryImpl implements UserRepository {
   Future<Either<Failure, User>> saveUser(User user) async {
     try {
       final userModel = UserModel.fromEntity(user);
-      await _isar.writeTxn(() async {
-        await _isar.userModels.put(userModel);
-      });
+      await _hiveService.usersBox.put(userModel.uid, userModel);
       return Right(userModel.toEntity());
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -48,9 +46,7 @@ class UserRepositoryImpl implements UserRepository {
     try {
       final updatedUser = user.copyWith(updatedAt: DateTime.now());
       final userModel = UserModel.fromEntity(updatedUser);
-      await _isar.writeTxn(() async {
-        await _isar.userModels.put(userModel);
-      });
+      await _hiveService.usersBox.put(userModel.uid, userModel);
       return Right(userModel.toEntity());
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -62,9 +58,7 @@ class UserRepositoryImpl implements UserRepository {
   @override
   Future<Either<Failure, void>> deleteUser(String uid) async {
     try {
-      await _isar.writeTxn(() async {
-        await _isar.userModels.where().uidEqualTo(uid).deleteAll();
-      });
+      await _hiveService.usersBox.delete(uid);
       return const Right(null);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -81,12 +75,9 @@ class UserRepositoryImpl implements UserRepository {
     required double cost,
   }) async {
     try {
-      final existingUser = await _isar.userModels
-          .where()
-          .uidEqualTo(uid)
-          .findFirst();
+      final existingUser = _hiveService.usersBox.get(uid);
       if (existingUser == null) {
-        return const Left(DatabaseFailure(message: 'User not found'));
+        return Left(DatabaseFailure(message: 'User not found'));
       }
 
       final updatedUser = existingUser.copyWith(
@@ -96,9 +87,7 @@ class UserRepositoryImpl implements UserRepository {
         updatedAt: DateTime.now(),
       );
 
-      await _isar.writeTxn(() async {
-        await _isar.userModels.put(updatedUser);
-      });
+      await _hiveService.usersBox.put(uid, updatedUser);
 
       return Right(updatedUser.toEntity());
     } on DatabaseException catch (e) {
@@ -111,9 +100,7 @@ class UserRepositoryImpl implements UserRepository {
   @override
   Future<Either<Failure, void>> clearUserData() async {
     try {
-      await _isar.writeTxn(() async {
-        await _isar.userModels.clear();
-      });
+      await _hiveService.usersBox.clear();
       return const Right(null);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));

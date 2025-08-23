@@ -1,7 +1,6 @@
 import 'package:dartz/dartz.dart';
-import 'package:isar/isar.dart';
 
-import '../../core/config/app_config.dart';
+import '../../core/database/hive_service.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/error/failures.dart';
 import '../../domain/entities/chat_message.dart';
@@ -9,20 +8,23 @@ import '../../domain/repositories/chat_repository.dart';
 import '../models/chat_message_model.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
-  final Isar _isar;
+  final HiveService _hiveService;
 
-  ChatRepositoryImpl({Isar? isar}) : _isar = isar ?? AppConfig.isar;
+  ChatRepositoryImpl({HiveService? hiveService})
+    : _hiveService = hiveService ?? HiveService.instance;
 
   @override
   Future<Either<Failure, List<ChatMessage>>> getChatHistory(
-    int? itineraryId,
+    String? itineraryId,
   ) async {
     try {
-      final query = itineraryId != null
-          ? _isar.chatMessageModels.where().itineraryIdEqualTo(itineraryId)
-          : _isar.chatMessageModels.where().itineraryIdIsNull();
-
-      final messageModels = await query.sortByTimestamp().findAll();
+      final messageModels = _hiveService.chatMessagesBox.values.where((model) {
+        if (itineraryId != null) {
+          return model.itineraryId == itineraryId;
+        }
+        return model.itineraryId == null;
+      }).toList();
+      messageModels.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       final messages = messageModels.map((model) => model.toEntity()).toList();
       return Right(messages);
     } on DatabaseException catch (e) {
@@ -36,9 +38,7 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<Either<Failure, ChatMessage>> saveMessage(ChatMessage message) async {
     try {
       final messageModel = ChatMessageModel.fromEntity(message);
-      await _isar.writeTxn(() async {
-        await _isar.chatMessageModels.put(messageModel);
-      });
+      await _hiveService.chatMessagesBox.put(messageModel.id, messageModel);
       return Right(messageModel.toEntity());
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -50,9 +50,7 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<Either<Failure, void>> deleteMessage(int messageId) async {
     try {
-      await _isar.writeTxn(() async {
-        await _isar.chatMessageModels.delete(messageId);
-      });
+      await _hiveService.chatMessagesBox.delete(messageId);
       return const Right(null);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -62,18 +60,19 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<Either<Failure, void>> clearChatHistory(int? itineraryId) async {
+  Future<Either<Failure, void>> clearChatHistory(String? itineraryId) async {
     try {
-      await _isar.writeTxn(() async {
-        if (itineraryId != null) {
-          await _isar.chatMessageModels
-              .where()
-              .itineraryIdEqualTo(itineraryId)
-              .deleteAll();
-        } else {
-          await _isar.chatMessageModels.where().itineraryIdIsNull().deleteAll();
-        }
-      });
+      final keysToDelete = _hiveService.chatMessagesBox.values
+          .where(
+            (model) => itineraryId != null
+                ? model.itineraryId == itineraryId
+                : model.itineraryId == null,
+          )
+          .map((model) => model.id)
+          .toList();
+      for (final key in keysToDelete) {
+        await _hiveService.chatMessagesBox.delete(key);
+      }
       return const Right(null);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -85,9 +84,7 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<Either<Failure, void>> clearAllChatHistory() async {
     try {
-      await _isar.writeTxn(() async {
-        await _isar.chatMessageModels.clear();
-      });
+      await _hiveService.chatMessagesBox.clear();
       return const Right(null);
     } on DatabaseException catch (e) {
       return Left(DatabaseFailure(message: e.message));
@@ -97,13 +94,11 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Stream<ChatMessage> watchMessages(int? itineraryId) {
-    final query = itineraryId != null
-        ? _isar.chatMessageModels.where().itineraryIdEqualTo(itineraryId)
-        : _isar.chatMessageModels.where().itineraryIdIsNull();
-
-    return query.watch(fireImmediately: true).map((models) {
-      return models.map((model) => model.toEntity()).last;
-    });
+  Stream<ChatMessage> watchMessages(int? itineraryId) async* {
+    // Hive does not support native streams, so you may need to use a custom solution.
+    // For now, this is a placeholder.
+    throw UnimplementedError(
+      'Hive does not support native streams. Use a ValueListenableBuilder or similar.',
+    );
   }
 }

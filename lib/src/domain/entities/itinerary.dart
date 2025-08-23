@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 class Itinerary extends Equatable {
-  final int? id;
+  final String? id;
   final String title;
   final String startDate;
   final String endDate;
@@ -26,7 +26,7 @@ class Itinerary extends Equatable {
   });
 
   Itinerary copyWith({
-    int? id,
+    String? id,
     String? title,
     String? startDate,
     String? endDate,
@@ -53,17 +53,17 @@ class Itinerary extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        title,
-        startDate,
-        endDate,
-        days,
-        createdAt,
-        updatedAt,
-        isOfflineAvailable,
-        totalCost,
-        currency,
-      ];
+    id,
+    title,
+    startDate,
+    endDate,
+    days,
+    createdAt,
+    updatedAt,
+    isOfflineAvailable,
+    totalCost,
+    currency,
+  ];
 }
 
 class ItineraryDay extends Equatable {
@@ -130,11 +130,11 @@ class ItineraryItem extends Equatable {
 
   @override
   List<Object?> get props => [
-        time,
-        activity,
-        location,
-        description,
-        estimatedCost,
-        category,
-      ];
+    time,
+    activity,
+    location,
+    description,
+    estimatedCost,
+    category,
+  ];
 }

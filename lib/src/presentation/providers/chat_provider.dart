@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/itinerary.dart';
@@ -8,7 +7,7 @@ import '../../domain/repositories/ai_service_repository.dart';
 import '../providers/repository_providers.dart';
 
 final chatProvider =
-    StateNotifierProvider.family<ChatNotifier, ChatState, int?>((
+    StateNotifierProvider.family<ChatNotifier, ChatState, String?>((
       ref,
       itineraryId,
     ) {
@@ -20,7 +19,7 @@ final chatProvider =
 class ChatNotifier extends StateNotifier<ChatState> {
   final ChatRepository _chatRepository;
   final AIServiceRepository _aiService;
-  final int? _itineraryId;
+  final String? _itineraryId;
 
   ChatNotifier(this._chatRepository, this._aiService, this._itineraryId)
     : super(const ChatState.initial()) {

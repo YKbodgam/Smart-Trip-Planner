@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:hive/hive.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
 
@@ -7,39 +7,49 @@ import '../../domain/entities/itinerary.dart';
 part 'itinerary_model.g.dart';
 
 @JsonSerializable()
-@collection
+@HiveType(typeId: 0) // Replaced Isar Collection with Hive HiveType
 class ItineraryModel extends Equatable {
-  Id id = Isar.autoIncrement; // ✅ mutable, Isar requires non-final
+  @HiveField(0) // Replaced Isar Id with Hive HiveField
+  final String id;
 
+  @HiveField(1)
   @JsonKey(name: 'title')
   final String title;
 
+  @HiveField(2)
   @JsonKey(name: 'startDate')
   final String startDate;
 
+  @HiveField(3)
   @JsonKey(name: 'endDate')
   final String endDate;
 
+  @HiveField(4)
   @JsonKey(name: 'days')
   final List<ItineraryDayModel> days;
 
+  @HiveField(5)
   @JsonKey(name: 'createdAt')
   final DateTime createdAt;
 
+  @HiveField(6)
   @JsonKey(name: 'updatedAt')
   final DateTime updatedAt;
 
+  @HiveField(7)
   @JsonKey(name: 'isOfflineAvailable')
   final bool isOfflineAvailable;
 
+  @HiveField(8)
   @JsonKey(name: 'totalCost')
   final double? totalCost;
 
+  @HiveField(9)
   @JsonKey(name: 'currency')
   final String? currency;
 
-  ItineraryModel({
-    this.id = Isar.autoIncrement,
+  const ItineraryModel({
+    required this.id, // Changed from auto-increment to required String id
     required this.title,
     required this.startDate,
     required this.endDate,
@@ -58,7 +68,10 @@ class ItineraryModel extends Equatable {
 
   factory ItineraryModel.fromEntity(Itinerary entity) {
     return ItineraryModel(
-      id: entity.id ?? Isar.autoIncrement,
+      id:
+          entity.id ??
+          DateTime.now().millisecondsSinceEpoch
+              .toString(), // Generate string ID if null
       title: entity.title,
       startDate: entity.startDate,
       endDate: entity.endDate,
@@ -75,7 +88,7 @@ class ItineraryModel extends Equatable {
 
   Itinerary toEntity() {
     return Itinerary(
-      id: id == Isar.autoIncrement ? null : id,
+      id: id,
       title: title,
       startDate: startDate,
       endDate: endDate,
@@ -89,7 +102,7 @@ class ItineraryModel extends Equatable {
   }
 
   ItineraryModel copyWith({
-    Id? id,
+    String? id,
     String? title,
     String? startDate,
     String? endDate,
@@ -114,7 +127,6 @@ class ItineraryModel extends Equatable {
     );
   }
 
-  @ignore // 👈 prevents Isar from trying to store this
   @override
   List<Object?> get props => [
     id,
@@ -131,14 +143,17 @@ class ItineraryModel extends Equatable {
 }
 
 @JsonSerializable()
-@embedded
+@HiveType(typeId: 1) // Added Hive type annotation
 class ItineraryDayModel extends Equatable {
+  @HiveField(0)
   @JsonKey(name: 'date')
   final String date;
 
+  @HiveField(1)
   @JsonKey(name: 'summary')
   final String summary;
 
+  @HiveField(2)
   @JsonKey(name: 'items')
   final List<ItineraryItemModel> items;
 
@@ -171,29 +186,34 @@ class ItineraryDayModel extends Equatable {
     );
   }
 
-  @ignore // 👈 prevents Isar from trying to store this
   @override
   List<Object?> get props => [date, summary, items];
 }
 
 @JsonSerializable()
-@embedded
+@HiveType(typeId: 2) // Added Hive type annotation
 class ItineraryItemModel extends Equatable {
+  @HiveField(0)
   @JsonKey(name: 'time')
   final String time;
 
+  @HiveField(1)
   @JsonKey(name: 'activity')
   final String activity;
 
+  @HiveField(2)
   @JsonKey(name: 'location')
   final String? location;
 
+  @HiveField(3)
   @JsonKey(name: 'description')
   final String? description;
 
+  @HiveField(4)
   @JsonKey(name: 'estimatedCost')
   final double? estimatedCost;
 
+  @HiveField(5)
   @JsonKey(name: 'category')
   final String? category;
 
@@ -233,7 +253,6 @@ class ItineraryItemModel extends Equatable {
     );
   }
 
-  @ignore // 👈 prevents Isar from trying to store this
   @override
   List<Object?> get props => [
     time,

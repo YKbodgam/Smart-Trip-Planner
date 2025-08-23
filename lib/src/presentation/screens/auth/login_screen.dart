@@ -66,13 +66,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       // TODO: Implement Google login logic
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
 
       if (mounted) {
         context.go('/home');
       }
     } catch (e) {
-      // TODO: Handle Google login error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

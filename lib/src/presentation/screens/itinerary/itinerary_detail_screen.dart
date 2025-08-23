@@ -36,7 +36,7 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
 
       // Mock itinerary data
       final mockItinerary = Itinerary(
-        id: int.parse(widget.itineraryId),
+        id: widget.itineraryId.toString(),
         title: "Kyoto 5-Day Solo Trip",
         startDate: "2025-04-10",
         endDate: "2025-04-15",

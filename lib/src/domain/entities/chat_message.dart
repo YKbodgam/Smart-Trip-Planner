@@ -1,16 +1,10 @@
 import 'package:equatable/equatable.dart';
 
-enum MessageType {
-  text,
-  itinerary,
-  error,
-  loading,
-  system,
-}
+enum MessageType { text, itinerary, error, loading, system }
 
 class ChatMessage extends Equatable {
-  final int? id;
-  final int? itineraryId;
+  final String? id;
+  final String? itineraryId;
   final String content;
   final bool isUser;
   final DateTime timestamp;
@@ -28,8 +22,8 @@ class ChatMessage extends Equatable {
   });
 
   ChatMessage copyWith({
-    int? id,
-    int? itineraryId,
+    String? id,
+    String? itineraryId,
     String? content,
     bool? isUser,
     DateTime? timestamp,
@@ -49,14 +43,14 @@ class ChatMessage extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        itineraryId,
-        content,
-        isUser,
-        timestamp,
-        messageType,
-        metadata,
-      ];
+    id,
+    itineraryId,
+    content,
+    isUser,
+    timestamp,
+    messageType,
+    metadata,
+  ];
 }
 
 class MessageMetadata extends Equatable {
@@ -91,11 +85,5 @@ class MessageMetadata extends Equatable {
   }
 
   @override
-  List<Object?> get props => [
-        tokensUsed,
-        cost,
-        processingTime,
-        model,
-        error,
-      ];
+  List<Object?> get props => [tokensUsed, cost, processingTime, model, error];
 }
