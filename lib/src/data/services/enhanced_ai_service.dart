@@ -60,6 +60,38 @@ class EnhancedAIService extends AIService {
     }
   }
 
+  Itinerary _parseItineraryFromJson(Map<String, dynamic> json) {
+    final days = (json['days'] as List<dynamic>).map((dayJson) {
+      final items = (dayJson['items'] as List<dynamic>).map((itemJson) {
+        return ItineraryItem(
+          time: itemJson['time'] ?? '',
+          activity: itemJson['activity'] ?? '',
+          location: itemJson['location'],
+          description: itemJson['description'],
+          estimatedCost: itemJson['estimatedCost']?.toDouble(),
+          category: itemJson['category'],
+        );
+      }).toList();
+
+      return ItineraryDay(
+        date: dayJson['date'] ?? '',
+        summary: dayJson['summary'] ?? '',
+        items: items,
+      );
+    }).toList();
+
+    return Itinerary(
+      title: json['title'] ?? 'Untitled Itinerary',
+      startDate: json['startDate'] ?? '',
+      endDate: json['endDate'] ?? '',
+      totalCost: json['totalCost']?.toDouble(),
+      currency: json['currency'] ?? 'USD',
+      days: days,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
   Future<Either<Failure, Itinerary>> _generateItineraryWithContext({
     required String prompt,
     List<ChatMessage>? chatHistory,
@@ -110,7 +142,9 @@ class EnhancedAIService extends AIService {
 
       return Left(AIServiceFailure(message: 'Failed to generate itinerary'));
     } on DioException catch (e) {
-      return _handleDioException(e) // ✅ fixed
+      return Left(
+        AIServiceFailure(message: e.message ?? 'AI service error'),
+      ); // ✅ fixed
     } catch (e) {
       return Left(UnknownFailure(message: e.toString()));
     }

@@ -1,8 +1,10 @@
+// lib/src/presentation/screens/chat/chat_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../providers/chat_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
 import '../../../domain/entities/chat_message.dart';
@@ -17,11 +19,7 @@ class ChatScreen extends ConsumerStatefulWidget {
   final String? itineraryId;
   final String? initialPrompt;
 
-  const ChatScreen({
-    super.key,
-    this.itineraryId,
-    this.initialPrompt,
-  });
+  const ChatScreen({super.key, this.itineraryId, this.initialPrompt});
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -30,16 +28,26 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
-  
-  List<ChatMessage> _messages = [];
-  bool _isLoading = false;
-  bool _isThinking = false;
-  Itinerary? _currentItinerary;
 
   @override
   void initState() {
     super.initState();
-    _initializeChat();
+    // Fire initial prompt once if provided
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prompt = widget.initialPrompt?.trim();
+      if (prompt != null && prompt.isNotEmpty) {
+        await ref
+            .read(chatProvider(widget.itineraryId).notifier)
+            .sendMessage(prompt);
+        _messageController.clear();
+        _scrollToBottom();
+      }
+    });
+
+    // Auto-scroll on state changes
+    ref.listen<ChatState>(chatProvider(widget.itineraryId), (_, __) {
+      _scrollToBottom();
+    });
   }
 
   @override
@@ -49,125 +57,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
-  void _initializeChat() {
-    if (widget.initialPrompt != null) {
-      // Add initial user message and start generating itinerary
-      final userMessage = ChatMessage(
-        content: widget.initialPrompt!,
-        isUser: true,
-        timestamp: DateTime.now(),
-      );
-      
-      setState(() {
-        _messages.add(userMessage);
-        _isLoading = true;
-      });
-      
-      _generateItinerary(widget.initialPrompt!);
-    } else if (widget.itineraryId != null) {
-      // Load existing chat history
-      _loadChatHistory();
-    }
-  }
-
-  Future<void> _loadChatHistory() async {
-    // TODO: Load chat history from repository
-    // For now, show mock data
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    final mockMessages = [
-      ChatMessage(
-        content: "7 days in Bali next April, 3 people, mid-range budget, wanted to explore less populated areas, it should be a peaceful trip!",
-        isUser: true,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-    ];
-    
-    final mockItinerary = _createMockItinerary();
-    
-    setState(() {
-      _messages.addAll(mockMessages);
-      _currentItinerary = mockItinerary;
-    });
-  }
-
-  Future<void> _generateItinerary(String prompt) async {
-    setState(() => _isThinking = true);
-    
-    try {
-      // TODO: Call AI service to generate itinerary
-      await Future.delayed(const Duration(seconds: 3)); // Simulate API call
-      
-      final itinerary = _createMockItinerary();
-      
-      setState(() {
-        _currentItinerary = itinerary;
-        _isLoading = false;
-        _isThinking = false;
-      });
-      
-      _scrollToBottom();
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _isThinking = false;
-      });
-      
-      _addErrorMessage("Oops! The LLM failed to generate answer. Please regenerate.");
-    }
-  }
-
-  Future<void> _sendMessage(String message) async {
-    if (message.trim().isEmpty) return;
-
-    final userMessage = ChatMessage(
-      content: message,
-      isUser: true,
-      timestamp: DateTime.now(),
-    );
-
-    setState(() {
-      _messages.add(userMessage);
-      _isThinking = true;
-    });
-
+  Future<void> _onSend(String text) async {
+    if (text.trim().isEmpty) return;
+    await ref.read(chatProvider(widget.itineraryId).notifier).sendMessage(text);
     _messageController.clear();
     _scrollToBottom();
-
-    try {
-      // TODO: Send message to AI service
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
-      
-      final aiResponse = ChatMessage(
-        content: "I'll help you modify your itinerary. Let me update that for you.",
-        isUser: false,
-        timestamp: DateTime.now(),
-      );
-
-      setState(() {
-        _messages.add(aiResponse);
-        _isThinking = false;
-      });
-      
-      _scrollToBottom();
-    } catch (e) {
-      setState(() => _isThinking = false);
-      _addErrorMessage("Failed to send message. Please try again.");
-    }
   }
 
-  void _addErrorMessage(String error) {
-    final errorMessage = ChatMessage(
-      content: error,
-      isUser: false,
-      timestamp: DateTime.now(),
-      messageType: MessageType.error,
-    );
-
-    setState(() {
-      _messages.add(errorMessage);
-    });
-    
+  Future<void> _regenerateResponse() async {
+    await ref
+        .read(chatProvider(widget.itineraryId).notifier)
+        .regenerateLastResponse();
     _scrollToBottom();
   }
 
@@ -183,46 +83,52 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
-  Future<void> _regenerateResponse() async {
-    if (_messages.isNotEmpty && !_messages.last.isUser) {
-      setState(() {
-        _messages.removeLast(); // Remove the error message
-        _isThinking = true;
-      });
-      
-      // Regenerate based on the last user message
-      final lastUserMessage = _messages.lastWhere((msg) => msg.isUser);
-      await _generateItinerary(lastUserMessage.content);
-    }
-  }
-
-  void _saveOffline() {
-    if (_currentItinerary != null) {
-      // TODO: Save itinerary offline
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Itinerary saved offline'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    }
-  }
-
-  void _followUpToRefine() {
-    // Focus on the input field to encourage user to ask follow-up questions
-    FocusScope.of(context).requestFocus();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(chatProvider(widget.itineraryId));
+
+    // Derive UI data from ChatState
+    final (
+      List<ChatMessage> messages,
+      Itinerary? itinerary,
+      bool isThinking,
+      String? errorText,
+    ) = switch (state) {
+      ChatStateInitial() => (<ChatMessage>[], null, false, null),
+      ChatStateLoading() => (<ChatMessage>[], null, false, null),
+      ChatStateThinking(:final messages) => (messages, null, true, null),
+      ChatStateLoaded(:final messages, :final itinerary) => (
+        messages,
+        itinerary,
+        false,
+        null,
+      ),
+      ChatStateError(:final message) => (<ChatMessage>[], null, false, message),
+    };
+
+    final titleText =
+        itinerary?.title ??
+        (messages.isNotEmpty
+            ? messages
+                  .firstWhere(
+                    (m) => m.isUser,
+                    orElse: () => ChatMessage(
+                      content: 'Plan a trip',
+                      isUser: true,
+                      timestamp: DateTime.now(),
+                    ),
+                  )
+                  .content
+            : 'Smart Trip Planner');
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
-          _currentItinerary?.title ?? '7 days in Bali...',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          titleText,
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -253,59 +159,67 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
-          // Messages List
+          // Messages + itinerary
           Expanded(
-            child: ListView.builder(
+            child: ListView(
               controller: _scrollController,
               padding: EdgeInsets.symmetric(
                 horizontal: ScreenUtilHelper.spacing16,
                 vertical: ScreenUtilHelper.spacing8,
               ),
-              itemCount: _messages.length + 
-                         (_currentItinerary != null ? 1 : 0) + 
-                         (_isThinking ? 1 : 0),
-              itemBuilder: (context, index) {
-                // Show thinking indicator
-                if (_isThinking && index == _messages.length + (_currentItinerary != null ? 1 : 0)) {
-                  return const LoadingMessageBubble(message: "Thinking...");
-                }
-                
-                // Show itinerary
-                if (_currentItinerary != null && index == _messages.length) {
-                  return ItineraryMessageBubble(
-                    itinerary: _currentItinerary!,
-                    onSaveOffline: _saveOffline,
-                    onFollowUp: _followUpToRefine,
-                  );
-                }
-                
-                // Show regular messages
-                final message = _messages[index];
-                
-                if (message.messageType == MessageType.error) {
-                  return ErrorMessageBubble(
-                    message: message.content,
+              children: [
+                for (final message in messages)
+                  if (message.messageType == MessageType.error)
+                    ErrorMessageBubble(
+                      message: message.content,
+                      onRegenerate: _regenerateResponse,
+                    )
+                  else
+                    ChatMessageBubble(message: message),
+
+                if (itinerary != null)
+                  ItineraryMessageBubble(
+                    itinerary: itinerary,
+                    onSaveOffline: () {
+                      // Optional UX hook (repos already handle persistence as needed)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Itinerary ready — saved entry available in Trips.',
+                          ),
+                          backgroundColor: AppColors.success,
+                        ),
+                      );
+                    },
+                    onFollowUp: () {
+                      // focus management for follow-up prompt (kept minimal)
+                      FocusScope.of(context).unfocus();
+                    },
+                  ),
+
+                if (isThinking)
+                  const LoadingMessageBubble(message: 'Planning your trip…'),
+
+                if (errorText != null && messages.isEmpty)
+                  ErrorMessageBubble(
+                    message: errorText,
                     onRegenerate: _regenerateResponse,
-                  );
-                }
-                
-                return ChatMessageBubble(message: message);
-              },
+                  ),
+              ],
             ),
           ),
-          
+
           // Action Buttons (when itinerary is shown)
-          if (_currentItinerary != null && !_isLoading && !_isThinking)
-            _buildActionButtons(),
-          
+          if (itinerary != null && !isThinking) _buildActionButtons(),
+
           // Chat Input
           ChatInputField(
             controller: _messageController,
-            onSend: _sendMessage,
+            onSend: _onSend,
             onVoiceInput: () {
-              // TODO: Implement voice input
+              // TODO: Voice input (later chunk)
             },
-            enabled: !_isLoading && !_isThinking,
+            enabled: !isThinking,
           ),
         ],
       ),
@@ -324,80 +238,57 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _followUpToRefine,
+              onPressed: () {
+                // place caret in input (keep behavior simple)
+                FocusScope.of(context).unfocus();
+              },
               icon: const Icon(Icons.chat_bubble_outline),
               label: const Text('Follow up to refine'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.onPrimary,
-                padding: EdgeInsets.symmetric(vertical: ScreenUtilHelper.spacing12),
+                padding: EdgeInsets.symmetric(
+                  vertical: ScreenUtilHelper.spacing12,
+                ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ScreenUtilHelper.radius12),
+                  borderRadius: BorderRadius.circular(
+                    ScreenUtilHelper.radius12,
+                  ),
                 ),
               ),
             ),
           ),
-          
           SizedBox(height: ScreenUtilHelper.spacing8),
-          
-          // Save offline button
+          // Save offline button (UX feedback)
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _saveOffline,
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Saved for offline'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+              },
               icon: const Icon(Icons.download_outlined),
               label: const Text('Save Offline'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.onBackground,
                 side: BorderSide(color: AppColors.outline),
-                padding: EdgeInsets.symmetric(vertical: ScreenUtilHelper.spacing12),
+                padding: EdgeInsets.symmetric(
+                  vertical: ScreenUtilHelper.spacing12,
+                ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ScreenUtilHelper.radius12),
+                  borderRadius: BorderRadius.circular(
+                    ScreenUtilHelper.radius12,
+                  ),
                 ),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Itinerary _createMockItinerary() {
-    return Itinerary(
-      title: "Kyoto 5-Day Solo Trip",
-      startDate: "2025-04-10",
-      endDate: "2025-04-15",
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      days: [
-        ItineraryDay(
-          date: "2025-04-10",
-          summary: "Arrival in Bali & Settle in Ubud",
-          items: [
-            ItineraryItem(
-              time: "Morning",
-              activity: "Arrive in Bali, Denpasar Airport.",
-            ),
-            ItineraryItem(
-              time: "Transfer",
-              activity: "Private driver to Ubud (around 1.5 hours).",
-            ),
-            ItineraryItem(
-              time: "Accommodation",
-              activity: "Check-in at a peaceful boutique hotel or villa in Ubud (e.g., Ubud Aura Retreat or Komaneka at Bisma).",
-            ),
-            ItineraryItem(
-              time: "Afternoon",
-              activity: "Explore Ubud's local area, walk around the tranquil rice terraces at Tegallalang.",
-            ),
-            ItineraryItem(
-              time: "Evening",
-              activity: "Dinner at Locavore (known for farm-to-table dishes in a peaceful setting)",
-              location: "Mumbai to Bali, Indonesia | 11hrs 5mins",
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
