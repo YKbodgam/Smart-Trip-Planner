@@ -282,9 +282,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Discussions**: [GitHub Discussions](https://github.com/YKbodgam/pathoria/discussions)
 - **Wiki**: [Project Wiki](https://github.com/YKbodgam/pathoria/wiki)
 
-## ⭐ Star History
+<!-- ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=YKbodgam/pathoria&type=Date)](https://star-history.com/#YKbodgam/pathoria&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=YKbodgam/pathoria&type=Date)](https://star-history.com/#YKbodgam/pathoria&Date) -->
 
 ---
 
