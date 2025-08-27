@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
@@ -12,8 +13,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
+    await dotenv.load();
+
     // 2. Initialize app configuration
-    await AppConfig.initialize();
+    // await AppConfig.initialize();
 
     // 3. Initialize Firebase (only if enabled in config)
     await Firebase.initializeApp(

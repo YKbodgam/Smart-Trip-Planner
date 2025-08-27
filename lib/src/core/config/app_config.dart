@@ -6,12 +6,6 @@ import 'environment_config.dart';
 class AppConfig {
   static late HiveService _hiveService; // Changed from Isar to Hive
 
-  // Environment-based configuration
-  static String get appName => AppEnvironmentConfig.appName;
-  static String get appVersion => AppEnvironmentConfig.appVersion;
-  static AppEnvironment get environment => AppEnvironmentConfig.environment;
-  static bool get isDebug => AppEnvironmentConfig.debugMode;
-
   // API Configuration
   static String get openaiBaseUrl => AppEnvironmentConfig.openaiBaseUrl;
   static String get openaiApiKey => AppEnvironmentConfig.openaiApiKey;
@@ -38,18 +32,16 @@ class AppConfig {
 
   static Future<void> initialize() async {
     try {
-      // Print configuration in debug mode
-      if (kDebugMode) {
-        AppEnvironmentConfig.printConfiguration();
-      }
-
       // Validate configuration
       final validationErrors = AppEnvironmentConfig.validateConfiguration();
-      if (validationErrors.isNotEmpty && environment.isProduction) {
+
+      if (validationErrors.isNotEmpty) {
         throw ConfigurationException(
           'Configuration validation failed: ${validationErrors.join(', ')}',
         );
-      } else if (validationErrors.isNotEmpty && kDebugMode) {
+      }
+      //
+      else if (validationErrors.isNotEmpty && kDebugMode) {
         print('Configuration warnings: ${validationErrors.join(', ')}');
       }
 
@@ -85,46 +77,10 @@ class AppConfig {
   static bool get isOpenAIConfigured => AppEnvironmentConfig.isOpenAIConfigured;
   static bool get isGoogleSearchConfigured =>
       AppEnvironmentConfig.isGoogleSearchConfigured;
-  static bool get isFirebaseConfigured =>
-      AppEnvironmentConfig.isFirebaseConfigured;
 
   // Get configuration summary
   static Map<String, dynamic> getConfigurationSummary() {
     return AppEnvironmentConfig.toMap();
-  }
-
-  // Environment-specific settings
-  static Duration get httpTimeout {
-    switch (environment) {
-      case AppEnvironment.development:
-        return const Duration(seconds: 30);
-      case AppEnvironment.staging:
-        return const Duration(seconds: 45);
-      case AppEnvironment.production:
-        return const Duration(seconds: 60);
-    }
-  }
-
-  static int get maxRetryAttempts {
-    switch (environment) {
-      case AppEnvironment.development:
-        return 2;
-      case AppEnvironment.staging:
-        return 3;
-      case AppEnvironment.production:
-        return 3;
-    }
-  }
-
-  static Duration get cacheExpiration {
-    switch (environment) {
-      case AppEnvironment.development:
-        return const Duration(minutes: 5);
-      case AppEnvironment.staging:
-        return const Duration(minutes: 15);
-      case AppEnvironment.production:
-        return const Duration(hours: 1);
-    }
   }
 }
 

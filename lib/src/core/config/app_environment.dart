@@ -1,77 +1,23 @@
-enum AppEnvironment {
-  development,
-  staging,
-  production;
-
-  static AppEnvironment get current {
-    const environment = String.fromEnvironment(
-      'ENVIRONMENT',
-      defaultValue: 'development',
-    );
-    switch (environment.toLowerCase()) {
-      case 'staging':
-        return AppEnvironment.staging;
-      case 'production':
-        return AppEnvironment.production;
-      default:
-        return AppEnvironment.development;
-    }
-  }
-
-  bool get isDevelopment => this == AppEnvironment.development;
-  bool get isStaging => this == AppEnvironment.staging;
-  bool get isProduction => this == AppEnvironment.production;
-  bool get isDebug => isDevelopment || isStaging;
-}
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppEnvironmentConfig {
-  static const String openaiApiKey = String.fromEnvironment(
-    'OPENAI_API_KEY',
+  static final String openaiApiKey = String.fromEnvironment(
+    dotenv.env['OPENAI_API_KEY']!,
     defaultValue: '',
   );
 
-  static const String openaiBaseUrl = String.fromEnvironment(
-    'OPENAI_BASE_URL',
+  static final String openaiBaseUrl = String.fromEnvironment(
+    dotenv.env['OPENAI_BASE_URL']!,
     defaultValue: 'https://api.openai.com/v1',
   );
 
-  static const String googleSearchApiKey = String.fromEnvironment(
-    'GOOGLE_SEARCH_API_KEY',
+  static final String googleSearchApiKey = String.fromEnvironment(
+    dotenv.env['GOOGLE_SEARCH_API_KEY']!,
     defaultValue: '',
   );
 
-  static const String googleSearchEngineId = String.fromEnvironment(
-    'GOOGLE_SEARCH_ENGINE_ID',
-    defaultValue: '',
-  );
-
-  static const String firebaseApiKey = String.fromEnvironment(
-    'FIREBASE_API_KEY',
-    defaultValue: '',
-  );
-
-  static const String firebaseProjectId = String.fromEnvironment(
-    'FIREBASE_PROJECT_ID',
-    defaultValue: '',
-  );
-
-  static const String appName = String.fromEnvironment(
-    'APP_NAME',
-    defaultValue: 'Smart Trip Planner',
-  );
-
-  static const String appVersion = String.fromEnvironment(
-    'APP_VERSION',
-    defaultValue: '1.0.0',
-  );
-
-  static const bool debugMode = bool.fromEnvironment(
-    'DEBUG_MODE',
-    defaultValue: true,
-  );
-
-  static const String databaseEncryptionKey = String.fromEnvironment(
-    'DATABASE_ENCRYPTION_KEY',
+  static final String googleSearchEngineId = String.fromEnvironment(
+    dotenv.env['GOOGLE_SEARCH_ENGINE_ID']!,
     defaultValue: '',
   );
 
@@ -106,18 +52,10 @@ class AppEnvironmentConfig {
       ) ??
       50.0;
 
-  // Computed properties
-  static AppEnvironment get environment => AppEnvironment.current;
-
   static bool get isOpenAIConfigured => openaiApiKey.isNotEmpty;
 
   static bool get isGoogleSearchConfigured =>
       googleSearchApiKey.isNotEmpty && googleSearchEngineId.isNotEmpty;
-
-  static bool get isFirebaseConfigured =>
-      firebaseApiKey.isNotEmpty && firebaseProjectId.isNotEmpty;
-
-  static bool get isDatabaseEncrypted => databaseEncryptionKey.isNotEmpty;
 
   // Validation methods
   static List<String> validateConfiguration() {
@@ -129,10 +67,6 @@ class AppEnvironmentConfig {
 
     if (!isGoogleSearchConfigured) {
       errors.add('Google Search API is not configured');
-    }
-
-    if (environment.isProduction && !isDatabaseEncrypted) {
-      errors.add('Database encryption key is required in production');
     }
 
     if (maxRequestsPerMinute <= 0) {
@@ -152,14 +86,8 @@ class AppEnvironmentConfig {
 
   static Map<String, dynamic> toMap() {
     return {
-      'environment': environment.name,
-      'appName': appName,
-      'appVersion': appVersion,
-      'debugMode': debugMode,
       'openaiConfigured': isOpenAIConfigured,
       'googleSearchConfigured': isGoogleSearchConfigured,
-      'firebaseConfigured': isFirebaseConfigured,
-      'databaseEncrypted': isDatabaseEncrypted,
       'enableAnalytics': enableAnalytics,
       'enableCrashReporting': enableCrashReporting,
       'enablePerformanceMonitoring': enablePerformanceMonitoring,
@@ -167,26 +95,5 @@ class AppEnvironmentConfig {
       'maxTokensPerDay': maxTokensPerDay,
       'maxCostPerDay': maxCostPerDay,
     };
-  }
-
-  static void printConfiguration() {
-    if (debugMode) {
-      print('=== App Environment Configuration ===');
-      print('Environment: ${environment.name}');
-      print('App Name: $appName');
-      print('App Version: $appVersion');
-      print('Debug Mode: $debugMode');
-      print('OpenAI Configured: $isOpenAIConfigured');
-      print('Google Search Configured: $isGoogleSearchConfigured');
-      print('Firebase Configured: $isFirebaseConfigured');
-      print('Database Encrypted: $isDatabaseEncrypted');
-      print('Analytics Enabled: $enableAnalytics');
-      print('Crash Reporting Enabled: $enableCrashReporting');
-      print('Performance Monitoring Enabled: $enablePerformanceMonitoring');
-      print('Max Requests/Min: $maxRequestsPerMinute');
-      print('Max Tokens/Day: $maxTokensPerDay');
-      print('Max Cost/Day: \$${maxCostPerDay.toStringAsFixed(2)}');
-      print('=====================================');
-    }
   }
 }

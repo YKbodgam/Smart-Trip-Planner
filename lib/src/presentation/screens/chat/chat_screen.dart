@@ -8,7 +8,6 @@ import '../../providers/chat_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
 import '../../../domain/entities/chat_message.dart';
-import '../../../domain/entities/itinerary.dart';
 import '../../widgets/chat/chat_message_bubble.dart';
 import '../../widgets/chat/chat_input_field.dart';
 import '../../widgets/chat/itinerary_message_bubble.dart';
@@ -29,10 +28,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
 
+  ProviderSubscription<ChatState>? _chatStateSubscription;
+
   @override
   void initState() {
     super.initState();
-    // Fire initial prompt once if provided
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final prompt = widget.initialPrompt?.trim();
       if (prompt != null && prompt.isNotEmpty) {
@@ -43,17 +43,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _scrollToBottom();
       }
     });
-
-    // Auto-scroll on state changes
-    ref.listen<ChatState>(chatProvider(widget.itineraryId), (_, __) {
-      _scrollToBottom();
-    });
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _chatStateSubscription?.close();
     super.dispose();
   }
 
@@ -85,26 +81,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for state changes and scroll to bottom
+    _chatStateSubscription ??= ref.listenManual<ChatState>(
+      chatProvider(widget.itineraryId),
+      (previous, next) {
+        _scrollToBottom();
+      },
+    );
+
     final state = ref.watch(chatProvider(widget.itineraryId));
 
-    // Derive UI data from ChatState
-    final (
-      List<ChatMessage> messages,
-      Itinerary? itinerary,
-      bool isThinking,
-      String? errorText,
-    ) = switch (state) {
-      ChatStateInitial() => (<ChatMessage>[], null, false, null),
-      ChatStateLoading() => (<ChatMessage>[], null, false, null),
-      ChatStateThinking(:final messages) => (messages, null, true, null),
-      ChatStateLoaded(:final messages, :final itinerary) => (
-        messages,
-        itinerary,
-        false,
-        null,
-      ),
-      ChatStateError(:final message) => (<ChatMessage>[], null, false, message),
-    };
+    final messages = state.maybeWhen(
+      loaded: (messages, itinerary) => messages,
+      thinking: (messages) => messages,
+      error: (message) => <ChatMessage>[],
+      orElse: () => <ChatMessage>[],
+    );
+
+    final itinerary = state.maybeWhen(
+      loaded: (messages, itinerary) => itinerary,
+      orElse: () => null,
+    );
+
+    final isThinking = state.maybeWhen(
+      thinking: (messages) => true,
+      orElse: () => false,
+    );
+
+    final errorText = state.maybeWhen(
+      error: (message) => message,
+      orElse: () => null,
+    );
 
     final titleText =
         itinerary?.title ??

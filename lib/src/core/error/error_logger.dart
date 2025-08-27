@@ -14,7 +14,7 @@ class ErrorLogger {
   Future<void> logError(Failure failure, [StackTrace? stackTrace]) async {
     try {
       final logEntry = _createLogEntry(failure, stackTrace);
-      
+
       // Log to console in debug mode
       if (kDebugMode) {
         print('ERROR: ${failure.runtimeType} - ${failure.message}');
@@ -27,9 +27,7 @@ class ErrorLogger {
       }
 
       // Log to file in production
-      if (AppConfig.environment.isProduction) {
-        await _writeToLogFile(logEntry);
-      }
+      await _writeToLogFile(logEntry);
 
       // Send to crash reporting service if enabled
       if (AppConfig.enableCrashReporting) {
@@ -48,7 +46,10 @@ class ErrorLogger {
     }
   }
 
-  Map<String, dynamic> _createLogEntry(Failure failure, [StackTrace? stackTrace]) {
+  Map<String, dynamic> _createLogEntry(
+    Failure failure, [
+    StackTrace? stackTrace,
+  ]) {
     return {
       'timestamp': DateTime.now().toIso8601String(),
       'type': failure.runtimeType.toString(),
@@ -58,8 +59,6 @@ class ErrorLogger {
       'details': failure.details,
       'severity': failure.severity.name,
       'stackTrace': stackTrace?.toString(),
-      'environment': AppConfig.environment.name,
-      'appVersion': AppConfig.appVersion,
     };
   }
 
@@ -118,7 +117,10 @@ class ErrorLogger {
     }
   }
 
-  Future<void> _sendToCrashReporting(Failure failure, [StackTrace? stackTrace]) async {
+  Future<void> _sendToCrashReporting(
+    Failure failure, [
+    StackTrace? stackTrace,
+  ]) async {
     try {
       // TODO: Integrate with crash reporting service (Firebase Crashlytics, Sentry, etc.)
       // Example implementation:
@@ -127,7 +129,7 @@ class ErrorLogger {
       //   stackTrace,
       //   fatal: failure.severity == ErrorSeverity.critical,
       // );
-      
+
       if (kDebugMode) {
         print('Would send to crash reporting: ${failure.message}');
       }
@@ -150,7 +152,7 @@ class ErrorLogger {
       //     'severity': failure.severity.name,
       //   },
       // );
-      
+
       if (kDebugMode) {
         print('Would send to analytics: ${failure.runtimeType}');
       }
@@ -172,19 +174,17 @@ class ErrorLogger {
 
       final lines = await logFile.readAsLines();
       final recentLines = lines.reversed.take(limit).toList();
-      
-      return recentLines
-          .map((line) {
-            try {
-              return jsonDecode(line) as Map<String, dynamic>;
-            } catch (e) {
-              return <String, dynamic>{
-                'error': 'Failed to parse log entry',
-                'raw': line,
-              };
-            }
-          })
-          .toList();
+
+      return recentLines.map((line) {
+        try {
+          return jsonDecode(line) as Map<String, dynamic>;
+        } catch (e) {
+          return <String, dynamic>{
+            'error': 'Failed to parse log entry',
+            'raw': line,
+          };
+        }
+      }).toList();
     } catch (e) {
       if (kDebugMode) {
         print('Failed to read log file: $e');
