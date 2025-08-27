@@ -36,6 +36,84 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
   }
 
+  Future<void> sendMessageStreamed(String content) async {
+    final userMessage = ChatMessage(
+      content: content,
+      isUser: true,
+      timestamp: DateTime.now(),
+      itineraryId: _itineraryId,
+    );
+
+    final currentMessages = state.maybeWhen(
+      loaded: (messages, itinerary) => messages,
+      orElse: () => <ChatMessage>[],
+    );
+    final updatedMessages = [...currentMessages, userMessage];
+    state = ChatState.loaded(updatedMessages, null);
+    await _chatRepository.saveMessage(userMessage);
+
+    // Add interim assistant message
+    ChatMessage? interimAssistant;
+    String interimContent = '';
+    state = ChatState.thinking(updatedMessages);
+
+    final chatHistory = updatedMessages.where((msg) => msg.isUser).toList();
+    await for (final chunk in _aiService.streamResponse(
+      prompt: content,
+      chatHistory: chatHistory,
+    )) {
+      chunk.fold(
+        (failure) {
+          final errorMessage = ChatMessage(
+            content: failure.message,
+            isUser: false,
+            timestamp: DateTime.now(),
+            messageType: MessageType.error,
+            itineraryId: _itineraryId,
+          );
+          final messagesWithError = [...updatedMessages, errorMessage];
+          state = ChatState.loaded(messagesWithError, null);
+          _chatRepository.saveMessage(errorMessage);
+        },
+        (partial) {
+          interimContent += partial;
+          if (interimAssistant == null) {
+            interimAssistant = ChatMessage(
+              content: interimContent,
+              isUser: false,
+              timestamp: DateTime.now(),
+              itineraryId: _itineraryId,
+              messageType: MessageType.text,
+            );
+            final messagesWithInterim = [...updatedMessages, interimAssistant!];
+            state = ChatState.thinking(
+              List<ChatMessage>.from(messagesWithInterim),
+            );
+            _chatRepository.saveMessage(interimAssistant!);
+          } else {
+            interimAssistant = interimAssistant!.copyWith(
+              content: interimContent,
+            );
+            final messagesWithInterim = [...updatedMessages, interimAssistant!];
+            state = ChatState.thinking(
+              List<ChatMessage>.from(messagesWithInterim),
+            );
+            _chatRepository.saveMessage(interimAssistant!);
+          }
+        },
+      );
+    }
+    // Finalize assistant message
+    if (interimAssistant != null) {
+      final finalAssistant = interimAssistant!.copyWith(
+        content: interimContent,
+      );
+      final messagesWithFinal = [...updatedMessages, finalAssistant];
+      state = ChatState.loaded(messagesWithFinal, null);
+      await _chatRepository.saveMessage(finalAssistant);
+    }
+  }
+
   Future<void> sendMessage(String content) async {
     final userMessage = ChatMessage(
       content: content,

@@ -1,4 +1,5 @@
-// lib/src/presentation/screens/chat/chat_screen.dart
+import '../../../core/utils/connectivity_helper.dart';
+import '../../../core/error/failures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -13,6 +14,7 @@ import '../../widgets/chat/chat_input_field.dart';
 import '../../widgets/chat/itinerary_message_bubble.dart';
 import '../../widgets/chat/loading_message_bubble.dart';
 import '../../widgets/chat/error_message_bubble.dart';
+import '../../widgets/chat/typing_indicator_bubble.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String? itineraryId;
@@ -55,9 +57,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _onSend(String text) async {
     if (text.trim().isEmpty) return;
-    await ref.read(chatProvider(widget.itineraryId).notifier).sendMessage(text);
-    _messageController.clear();
-    _scrollToBottom();
+    final online = await ConnectivityHelper.isOnline();
+    if (!online) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You are offline. Please connect to the internet.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    // Use streaming mode
+    try {
+      final notifier = ref.read(chatProvider(widget.itineraryId).notifier);
+      await notifier.sendMessageStreamed(text);
+      _messageController.clear();
+      _scrollToBottom();
+    } on RateLimitFailure {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Rate limit exceeded. Please wait a moment and try again.',
+          ),
+          backgroundColor: AppColors.warning,
+          duration: Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e is NetworkFailure
+                ? 'Network error. Please check your connection and try again.'
+                : 'An error occurred. Please try again.',
+          ),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _regenerateResponse() async {
@@ -205,7 +245,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
 
                 if (isThinking)
-                  const LoadingMessageBubble(message: 'Planning your trip…'),
+                  state.maybeWhen(
+                    thinking: (messages) {
+                      // Find the interim assistant message if it exists
+                      final interimMessage = messages.lastWhere(
+                        (m) => !m.isUser,
+                        orElse: () => ChatMessage(
+                          content: '',
+                          isUser: false,
+                          timestamp: DateTime.now(),
+                        ),
+                      );
+                      return TypingIndicatorBubble(
+                        partialText: interimMessage.content,
+                      );
+                    },
+                    orElse: () =>
+                        const LoadingMessageBubble(message: 'Typing…'),
+                  ),
 
                 if (errorText != null && messages.isEmpty)
                   ErrorMessageBubble(
@@ -223,9 +280,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ChatInputField(
             controller: _messageController,
             onSend: _onSend,
-            onVoiceInput: () {
-              // TODO: Voice input (later chunk)
-            },
+            onVoiceInput: () {},
             enabled: !isThinking,
           ),
         ],

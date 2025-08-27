@@ -6,22 +6,29 @@ final tokenTrackingServiceProvider = Provider<TokenTrackingService>((ref) {
   return TokenTrackingService();
 });
 
-final tokenUsageProvider = FutureProvider.family<TokenUsageStats, String>((ref, userId) async {
+final tokenUsageProvider = FutureProvider.family<TokenUsageStats, String>((
+  ref,
+  userId,
+) async {
   final tokenService = ref.read(tokenTrackingServiceProvider);
   final result = await tokenService.getUserTokenUsage(userId);
-  
+
   return result.fold(
     (failure) => throw Exception(failure.message),
     (stats) => stats,
   );
 });
 
-final usageHistoryProvider = FutureProvider.family<List<TokenUsageRecord>, String>((ref, userId) async {
-  final tokenService = ref.read(tokenTrackingServiceProvider);
-  final result = await tokenService.getUserUsageHistory(userId: userId, limit: 10);
-  
-  return result.fold(
-    (failure) => throw Exception(failure.message),
-    (records) => records,
-  );
-});
+final usageHistoryProvider =
+    FutureProvider.family<List<TokenUsageRecord>, String>((ref, userId) async {
+      final tokenService = ref.read(tokenTrackingServiceProvider);
+      final result = await tokenService.getUserUsageHistory(
+        userId: userId,
+        limit: 10,
+      );
+
+      return result.fold(
+        (failure) => throw Exception(failure.message),
+        (records) => records,
+      );
+    });

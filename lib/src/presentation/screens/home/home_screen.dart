@@ -40,13 +40,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _isCreatingItinerary = true);
 
     try {
-      // TODO: Implement itinerary creation logic
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
-
-      if (mounted) {
-        // Navigate to chat screen with the prompt
-        context.go('/chat?prompt=${Uri.encodeComponent(_tripController.text)}');
-      }
+      final prompt = _tripController.text.trim();
+      context.go('/chat?prompt=${Uri.encodeComponent(prompt)}');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -105,9 +100,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             // Trip Input Card
             TripInputCard(
               controller: _tripController,
-              onVoiceInput: () {
-                // TODO: Implement voice input
-              },
+              onVoiceInput: null, // Not part of MVP
             ),
 
             SizedBox(height: ScreenUtilHelper.spacing24),

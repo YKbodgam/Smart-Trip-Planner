@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 import '../config/app_config.dart';
 import 'failures.dart';
@@ -122,16 +124,30 @@ class ErrorLogger {
     StackTrace? stackTrace,
   ]) async {
     try {
-      // TODO: Integrate with crash reporting service (Firebase Crashlytics, Sentry, etc.)
-      // Example implementation:
-      // await FirebaseCrashlytics.instance.recordError(
-      //   failure,
-      //   stackTrace,
-      //   fatal: failure.severity == ErrorSeverity.critical,
-      // );
+      await FirebaseCrashlytics.instance.recordError(
+        failure,
+        stackTrace,
+        reason: failure.message,
+        fatal: failure.severity == ErrorSeverity.critical,
+        information: [
+          if (failure.details != null) 'Details: ${failure.details}',
+          'Code: ${failure.code}',
+          'User Message: ${failure.userFriendlyMessage}',
+        ],
+      );
+
+      // Set custom keys for better error categorization
+      await FirebaseCrashlytics.instance.setCustomKey(
+        'error_type',
+        failure.runtimeType.toString(),
+      );
+      await FirebaseCrashlytics.instance.setCustomKey(
+        'severity',
+        failure.severity.name,
+      );
 
       if (kDebugMode) {
-        print('Would send to crash reporting: ${failure.message}');
+        print('Sent to crash reporting: ${failure.message}');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -142,19 +158,30 @@ class ErrorLogger {
 
   Future<void> _sendToAnalytics(Failure failure) async {
     try {
-      // TODO: Integrate with analytics service (Firebase Analytics, etc.)
-      // Example implementation:
-      // await FirebaseAnalytics.instance.logEvent(
-      //   name: 'error_occurred',
-      //   parameters: {
-      //     'error_type': failure.runtimeType.toString(),
-      //     'error_message': failure.message,
-      //     'severity': failure.severity.name,
-      //   },
-      // );
+      final analytics = FirebaseAnalytics.instance;
+
+      // Log the error as an event
+      await analytics.logEvent(
+        name: 'error_occurred',
+        parameters: {
+          'error_type': failure.runtimeType.toString(),
+          'error_message': failure.message,
+          'error_code': failure.code ?? 'unknown',
+          'severity': failure.severity.name,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+
+      // Set user properties if this is a critical error
+      if (failure.severity == ErrorSeverity.critical) {
+        await analytics.setUserProperty(
+          name: 'last_critical_error',
+          value: failure.message,
+        );
+      }
 
       if (kDebugMode) {
-        print('Would send to analytics: ${failure.runtimeType}');
+        print('Sent to analytics: ${failure.runtimeType}');
       }
     } catch (e) {
       if (kDebugMode) {

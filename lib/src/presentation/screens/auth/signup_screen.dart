@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/common/custom_button.dart';
 import '../../widgets/auth/google_sign_in_button.dart';
@@ -40,14 +41,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement email signup logic
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      await ref
+          .read(authProvider.notifier)
+          .signUpWithEmail(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
 
       if (mounted) {
         context.go('/home');
       }
     } catch (e) {
-      // TODO: Handle signup error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -67,14 +71,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement Google signup logic
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      await ref.read(authProvider.notifier).signInWithGoogle();
 
       if (mounted) {
         context.go('/home');
       }
     } catch (e) {
-      // TODO: Handle Google signup error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

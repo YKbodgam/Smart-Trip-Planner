@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
+import '../../providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -32,32 +33,33 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
+    );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.2, 0.8, curve: Curves.elasticOut),
-    ));
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.2, 0.8, curve: Curves.elasticOut),
+      ),
+    );
 
     _animationController.forward();
   }
 
   Future<void> _navigateToNextScreen() async {
     await Future.delayed(const Duration(milliseconds: 2500));
-    
+
     if (mounted) {
-      // TODO: Check authentication status
-      // For now, navigate to login
-      context.go('/login');
+      // Check if user is authenticated by trying to get the current Firebase user
+      final currentUser = await ref
+          .read(authProvider.notifier)
+          .getCurrentUser();
+      final route = currentUser != null ? '/home' : '/login';
+      context.go(route);
     }
   }
 
@@ -96,20 +98,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         color: AppColors.onPrimary,
                       ),
                     ),
-                    
+
                     SizedBox(height: ScreenUtilHelper.spacing24),
-                    
+
                     // App Name
                     Text(
                       'Itinera AI',
-                      style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.displayMedium
+                          ?.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
-                    
+
                     SizedBox(height: ScreenUtilHelper.spacing8),
-                    
+
                     // Tagline
                     Text(
                       'Smart Trip Planner',

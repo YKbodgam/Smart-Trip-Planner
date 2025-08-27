@@ -124,6 +124,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState.unauthenticated();
   }
 
+  Future<User?> getCurrentUser() async {
+    final firebaseUser = _firebaseAuth.currentUser;
+    if (firebaseUser == null) {
+      return null;
+    }
+
+    final result = await _userRepository.getCurrentUser();
+    return result.fold((failure) => null, (user) => user);
+  }
+
   String _getAuthErrorMessage(String code) {
     switch (code) {
       case 'user-not-found':
@@ -150,6 +160,30 @@ class AuthState {
   const factory AuthState.authenticated(User user) = _Authenticated;
   const factory AuthState.unauthenticated() = _Unauthenticated;
   const factory AuthState.error(String message) = _Error;
+
+  T maybeWhen<T>({
+    T Function()? initial,
+    T Function()? loading,
+    T Function(User user)? authenticated,
+    T Function()? unauthenticated,
+    T Function(String message)? error,
+    required T Function() orElse,
+  }) {
+    if (this is _Initial && initial != null) {
+      return initial();
+    } else if (this is _Loading && loading != null) {
+      return loading();
+    } else if (this is _Authenticated && authenticated != null) {
+      final s = this as _Authenticated;
+      return authenticated(s.user);
+    } else if (this is _Unauthenticated && unauthenticated != null) {
+      return unauthenticated();
+    } else if (this is _Error && error != null) {
+      final s = this as _Error;
+      return error(s.message);
+    }
+    return orElse();
+  }
 }
 
 class _Initial extends AuthState {

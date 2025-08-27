@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+
+import '../../../data/services/token_usage_provider.dart';
+import '../../providers/auth_provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
@@ -9,11 +13,30 @@ import '../../widgets/profile/profile_header.dart';
 import '../../widgets/profile/token_usage_card.dart';
 import '../../widgets/common/custom_button.dart';
 
+final metricsHudProvider = StateProvider<bool>((ref) => false);
+
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
+  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inHours < 1) {
+      final minutes = difference.inMinutes;
+      return '$minutes minute${minutes == 1 ? '' : 's'} ago';
+    } else if (difference.inDays < 1) {
+      final hours = difference.inHours;
+      return '$hours hour${hours == 1 ? '' : 's'} ago';
+    } else {
+      final formatter = DateFormat('MMM d, h:mm a');
+      return formatter.format(dateTime);
+    }
+  }
+
   Future<void> _handleLogout(BuildContext context) async {
-    // Show confirmation dialog
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -26,9 +49,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
-            ),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('Logout'),
           ),
         ],
@@ -36,14 +57,13 @@ class ProfileScreen extends ConsumerWidget {
     );
 
     if (shouldLogout == true && context.mounted) {
-      // TODO: Implement logout logic
-      // Clear user data, tokens, etc.
       context.go('/login');
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final showMetricsHud = ref.watch(metricsHudProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -54,6 +74,19 @@ class ProfileScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.bug_report,
+              color: showMetricsHud
+                  ? AppColors.primary
+                  : AppColors.onSurfaceVariant,
+            ),
+            onPressed: () =>
+                ref.read(metricsHudProvider.notifier).state = !showMetricsHud,
+            tooltip: 'Toggle Metrics HUD',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(horizontal: ScreenUtilHelper.spacing24),
@@ -61,36 +94,26 @@ class ProfileScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(height: ScreenUtilHelper.spacing24),
-            
-            // Profile Header
             const ProfileHeader(
               name: 'Shubham S.',
               email: 'shubham.s@gmail.com',
               avatarText: 'S',
             ),
-            
             SizedBox(height: ScreenUtilHelper.spacing32),
-            
-            // Token Usage Cards
             TokenUsageCard(
               title: 'Request Tokens',
               used: 100,
               total: 1000,
               color: AppColors.primary,
             ),
-            
             SizedBox(height: ScreenUtilHelper.spacing16),
-            
             TokenUsageCard(
               title: 'Response Tokens',
               used: 75,
               total: 1000,
               color: AppColors.error,
             ),
-            
             SizedBox(height: ScreenUtilHelper.spacing16),
-            
-            // Total Cost Card
             Container(
               padding: EdgeInsets.all(ScreenUtilHelper.spacing20),
               decoration: BoxDecoration(
@@ -118,23 +141,79 @@ class ProfileScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            
             SizedBox(height: ScreenUtilHelper.spacing40),
-            
-            // Settings Section (Future Enhancement)
             _buildSettingsSection(context),
-            
             SizedBox(height: ScreenUtilHelper.spacing40),
-            
-            // Logout Button
             CustomButton(
               text: 'Log Out',
               type: ButtonType.outline,
               onPressed: () => _handleLogout(context),
               icon: Icons.logout,
             ),
-            
             SizedBox(height: ScreenUtilHelper.spacing24),
+            if (showMetricsHud)
+              Container(
+                margin: EdgeInsets.symmetric(
+                  vertical: ScreenUtilHelper.spacing16,
+                ),
+                padding: EdgeInsets.all(ScreenUtilHelper.spacing16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(
+                    ScreenUtilHelper.radius16,
+                  ),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Metrics HUD',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    SizedBox(height: ScreenUtilHelper.spacing8),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final user = ref
+                            .watch(authProvider)
+                            .maybeWhen(
+                              authenticated: (user) => user,
+                              orElse: () => null,
+                            );
+
+                        if (user == null) {
+                          return const SizedBox();
+                        }
+
+                        final tokenStats = ref.watch(tokenUsageStatsProvider);
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Model: GPT-4o-mini'),
+                            Text(
+                              'Request Tokens: ${tokenStats.requestTokensUsed}/${tokenStats.requestTokensLimit}',
+                            ),
+                            Text(
+                              'Response Tokens: ${tokenStats.responseTokensUsed}/${tokenStats.responseTokensLimit}',
+                            ),
+                            Text('Total Tokens: ${tokenStats.totalTokensUsed}'),
+                            Text(
+                              'Cost (USD): \$${tokenStats.totalCost.toStringAsFixed(3)}',
+                            ),
+                            Text(
+                              'Last Updated: ${_formatDateTime(DateTime.now())}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -152,48 +231,34 @@ class ProfileScreen extends ConsumerWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        
         SizedBox(height: ScreenUtilHelper.spacing16),
-        
-        // Settings Items
         _buildSettingsItem(
           context,
           icon: Icons.notifications_outlined,
           title: 'Notifications',
           subtitle: 'Manage your notification preferences',
-          onTap: () {
-            // TODO: Navigate to notifications settings
-          },
+          onTap: () {},
         ),
-        
         _buildSettingsItem(
           context,
           icon: Icons.language_outlined,
           title: 'Language',
           subtitle: 'English',
-          onTap: () {
-            // TODO: Navigate to language settings
-          },
+          onTap: () {},
         ),
-        
         _buildSettingsItem(
           context,
           icon: Icons.help_outline,
           title: 'Help & Support',
           subtitle: 'Get help and contact support',
-          onTap: () {
-            // TODO: Navigate to help & support
-          },
+          onTap: () {},
         ),
-        
         _buildSettingsItem(
           context,
           icon: Icons.info_outline,
           title: 'About',
           subtitle: 'App version and information',
-          onTap: () {
-            // TODO: Navigate to about page
-          },
+          onTap: () {},
         ),
       ],
     );
@@ -223,15 +288,9 @@ class ProfileScreen extends ConsumerWidget {
                 color: AppColors.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(ScreenUtilHelper.radius8),
               ),
-              child: Icon(
-                icon,
-                color: AppColors.primary,
-                size: 20.w,
-              ),
+              child: Icon(icon, color: AppColors.primary),
             ),
-            
-            SizedBox(width: ScreenUtilHelper.spacing16),
-            
+            SizedBox(width: ScreenUtilHelper.spacing12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,11 +298,10 @@ class ProfileScreen extends ConsumerWidget {
                   Text(
                     title,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.onBackground,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  SizedBox(height: 2.h),
+                  SizedBox(height: ScreenUtilHelper.spacing4),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -253,11 +311,10 @@ class ProfileScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            
             Icon(
-              Icons.chevron_right,
+              Icons.arrow_forward_ios,
+              size: 16.w,
               color: AppColors.onSurfaceVariant,
-              size: 20.w,
             ),
           ],
         ),

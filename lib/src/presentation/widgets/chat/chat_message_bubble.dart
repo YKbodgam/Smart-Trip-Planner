@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -8,10 +9,7 @@ import '../../../domain/entities/chat_message.dart';
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
 
-  const ChatMessageBubble({
-    super.key,
-    required this.message,
-  });
+  const ChatMessageBubble({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -39,11 +37,11 @@ class ChatMessageBubble extends StatelessWidget {
             ),
             SizedBox(width: ScreenUtilHelper.spacing8),
           ],
-          
+
           Expanded(
             child: Column(
-              crossAxisAlignment: message.isUser 
-                  ? CrossAxisAlignment.end 
+              crossAxisAlignment: message.isUser
+                  ? CrossAxisAlignment.end
                   : CrossAxisAlignment.start,
               children: [
                 // Sender Label
@@ -58,7 +56,7 @@ class ChatMessageBubble extends StatelessWidget {
                       ),
                     ),
                   ),
-                
+
                 if (message.isUser)
                   Padding(
                     padding: EdgeInsets.only(bottom: ScreenUtilHelper.spacing4),
@@ -70,17 +68,19 @@ class ChatMessageBubble extends StatelessWidget {
                       ),
                     ),
                   ),
-                
+
                 // Message Bubble
                 Container(
                   padding: EdgeInsets.all(ScreenUtilHelper.spacing16),
                   decoration: BoxDecoration(
-                    color: message.isUser 
-                        ? AppColors.userMessageBg 
+                    color: message.isUser
+                        ? AppColors.userMessageBg
                         : AppColors.aiMessageBg,
-                    borderRadius: BorderRadius.circular(ScreenUtilHelper.radius16),
-                    border: message.isUser 
-                        ? null 
+                    borderRadius: BorderRadius.circular(
+                      ScreenUtilHelper.radius16,
+                    ),
+                    border: message.isUser
+                        ? null
                         : Border.all(color: AppColors.outline.withOpacity(0.2)),
                   ),
                   child: Text(
@@ -90,14 +90,20 @@ class ChatMessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 // Copy Button for user messages
                 if (message.isUser)
                   Padding(
                     padding: EdgeInsets.only(top: ScreenUtilHelper.spacing8),
                     child: TextButton.icon(
                       onPressed: () {
-                        // TODO: Copy message to clipboard
+                        Clipboard.setData(ClipboardData(text: message.content));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Message copied to clipboard'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
                       },
                       icon: Icon(
                         Icons.copy_outlined,
@@ -123,7 +129,7 @@ class ChatMessageBubble extends StatelessWidget {
               ],
             ),
           ),
-          
+
           if (message.isUser) ...[
             SizedBox(width: ScreenUtilHelper.spacing8),
             // User Avatar

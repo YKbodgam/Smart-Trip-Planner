@@ -86,8 +86,16 @@ class AIService implements AIServiceRepository {
         if (toolCall['function']['name'] == 'generate_itinerary') {
           final argumentsJson = toolCall['function']['arguments'];
           final itineraryData = json.decode(argumentsJson);
-          final itinerary = _parseItineraryFromJson(itineraryData);
-          return Right(itinerary);
+          try {
+            final itinerary = _parseItineraryFromJson(itineraryData);
+            return Right(itinerary);
+          } on FormatException catch (e) {
+            return Left(
+              AIServiceFailure(
+                message: 'Itinerary schema validation failed: \\${e.message}',
+              ),
+            );
+          }
         }
       }
 
@@ -404,6 +412,20 @@ class AIService implements AIServiceRepository {
   }
 
   Itinerary _parseItineraryFromJson(Map<String, dynamic> json) {
+    // Schema validation
+    if (json['title'] == null ||
+        json['startDate'] == null ||
+        json['endDate'] == null ||
+        json['days'] == null) {
+      throw FormatException(
+        'Itinerary JSON schema invalid: missing required fields',
+      );
+    }
+    if (json['days'] is! List || (json['days'] as List).isEmpty) {
+      throw FormatException(
+        'Itinerary JSON schema invalid: days must be a non-empty list',
+      );
+    }
     final days = (json['days'] as List<dynamic>).map((dayJson) {
       final items = (dayJson['items'] as List<dynamic>).map((itemJson) {
         return ItineraryItem(

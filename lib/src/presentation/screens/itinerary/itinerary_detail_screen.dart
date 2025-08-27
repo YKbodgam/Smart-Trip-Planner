@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
 import '../../../domain/entities/itinerary.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/repository_providers.dart';
 import '../../widgets/itinerary/itinerary_day_card.dart';
 
 class ItineraryDetailScreen extends ConsumerStatefulWidget {
@@ -31,58 +34,30 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
 
   Future<void> _loadItinerary() async {
     try {
-      // TODO: Load itinerary from repository
-      await Future.delayed(const Duration(seconds: 1)); // Simulate loading
+      final currentUser = await ref
+          .read(authProvider.notifier)
+          .getCurrentUser();
 
-      // Mock itinerary data
-      final mockItinerary = Itinerary(
-        id: widget.itineraryId.toString(),
-        title: "Kyoto 5-Day Solo Trip",
-        startDate: "2025-04-10",
-        endDate: "2025-04-15",
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        isOfflineAvailable: true,
-        days: [
-          ItineraryDay(
-            date: "2025-04-10",
-            summary: "Arrival in Bali & Settle in Ubud",
-            items: [
-              ItineraryItem(
-                time: "Morning",
-                activity: "Arrive in Bali, Denpasar Airport.",
-              ),
-              ItineraryItem(
-                time: "Transfer",
-                activity: "Private driver to Ubud (around 1.5 hours).",
-              ),
-              ItineraryItem(
-                time: "Accommodation",
-                activity:
-                    "Check-in at a peaceful boutique hotel or villa in Ubud (e.g., Ubud Aura Retreat or Komaneka at Bisma).",
-              ),
-              ItineraryItem(
-                time: "Afternoon",
-                activity:
-                    "Explore Ubud's local area, walk around the tranquil rice terraces at Tegallalang.",
-              ),
-              ItineraryItem(
-                time: "Evening",
-                activity:
-                    "Dinner at Locavore (known for farm-to-table dishes in a peaceful setting)",
-              ),
-            ],
-          ),
-        ],
+      if (currentUser == null) {
+        throw Exception('User not logged in');
+      }
+
+      final repository = ref.read(itineraryRepositoryProvider);
+      final result = await repository.getItineraryById(
+        int.parse(widget.itineraryId),
       );
 
-      setState(() {
-        _itinerary = mockItinerary;
-        _isLoading = false;
+      result.fold((failure) => throw Exception(failure.message), (itinerary) {
+        if (mounted) {
+          setState(() {
+            _itinerary = itinerary;
+            _isLoading = false;
+          });
+        }
       });
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to load itinerary: ${e.toString()}'),
@@ -94,15 +69,35 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
   }
 
   Future<void> _openInMaps() async {
-    // TODO: Open maps with itinerary locations
-    const url = 'https://maps.google.com/?q=Ubud,Bali';
+    if (_itinerary == null || _itinerary!.days.isEmpty) return;
+
+    final firstDay = _itinerary!.days.first;
+    final firstLocation = firstDay.items.firstWhere(
+      (item) => item.location != null,
+      orElse: () => firstDay.items.first,
+    );
+
+    final query = firstLocation.location ?? firstLocation.activity;
+    final url = 'https://maps.google.com/?q=${Uri.encodeComponent(query)}';
+
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url));
     }
   }
 
   void _copyItinerary() {
-    // TODO: Copy itinerary to clipboard
+    if (_itinerary == null) return;
+
+    final text = _itinerary!.days
+        .map((day) {
+          final activities = day.items
+              .map((item) => '${item.time}: ${item.activity}')
+              .join('\n');
+          return 'Day ${_itinerary!.days.indexOf(day) + 1}: ${day.summary}\n$activities';
+        })
+        .join('\n\n');
+
+    Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Itinerary copied to clipboard'),
@@ -111,24 +106,86 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
     );
   }
 
-  void _saveOffline() {
-    // TODO: Save itinerary offline
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Itinerary saved offline'),
-        backgroundColor: AppColors.success,
-      ),
-    );
+  Future<void> _saveOffline() async {
+    if (_itinerary == null) return;
+
+    try {
+      final repository = ref.read(itineraryRepositoryProvider);
+      final result = await repository.markItineraryOffline(
+        int.parse(widget.itineraryId),
+      );
+
+      result.fold((failure) => throw Exception(failure.message), (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Itinerary saved offline'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save offline: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
-  void _regenerateItinerary() {
-    // TODO: Regenerate itinerary
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Regenerating itinerary...'),
-        backgroundColor: AppColors.info,
-      ),
-    );
+  Future<void> _regenerateItinerary() async {
+    if (_itinerary == null) return;
+
+    try {
+      setState(() => _isLoading = true);
+
+      final aiService = ref.read(aiServiceRepositoryProvider);
+      final prompt =
+          'Regenerate itinerary for ${_itinerary!.title} with similar duration and style but different activities';
+
+      final result = await aiService.generateItinerary(
+        prompt: prompt,
+        existingItinerary: _itinerary,
+      );
+
+      result.fold((failure) => throw Exception(failure.message), (
+        newItinerary,
+      ) async {
+        final repository = ref.read(itineraryRepositoryProvider);
+        final saveResult = await repository.saveItinerary(newItinerary);
+
+        saveResult.fold((failure) => throw Exception(failure.message), (
+          savedItinerary,
+        ) {
+          if (mounted) {
+            setState(() {
+              _itinerary = savedItinerary;
+              _isLoading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Itinerary regenerated successfully'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          }
+        });
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to regenerate itinerary: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override

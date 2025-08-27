@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 import 'app.dart';
 import 'firebase_options.dart';
-import 'src/core/config/app_config.dart';
 
 Future<void> main() async {
   // Ensure Flutter engine is initialized before any async work
@@ -15,13 +15,16 @@ Future<void> main() async {
   try {
     await dotenv.load();
 
-    // 2. Initialize app configuration
-    // await AppConfig.initialize();
-
     // 3. Initialize Firebase (only if enabled in config)
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // Enable crash collection
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+
+    // Pass all uncaught errors to Crashlytics
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
 
     // 4. Lock orientation
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

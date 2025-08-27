@@ -1,16 +1,25 @@
+import 'dart:async';
 import 'package:dartz/dartz.dart';
 
 import '../../core/database/hive_service.dart';
 import '../../core/error/failures.dart';
 
 class TokenTrackingService {
+  static final TokenTrackingService _instance =
+      TokenTrackingService._internal();
+  static TokenTrackingService get instance => _instance;
+
   final HiveService _hiveService;
+  final _controller = StreamController<TokenUsageRecord>.broadcast();
+  Stream<TokenUsageRecord> get usageStream => _controller.stream;
 
   // OpenAI pricing (as of 2024) - prices per 1K tokens
   static const double _gpt4oMiniInputPrice = 0.00015; // $0.15 per 1M tokens
   static const double _gpt4oMiniOutputPrice = 0.0006; // $0.60 per 1M tokens
   static const double _gpt4InputPrice = 0.03; // $30 per 1M tokens
   static const double _gpt4OutputPrice = 0.06; // $60 per 1M tokens
+
+  TokenTrackingService._internal() : _hiveService = HiveService.instance;
 
   TokenTrackingService({HiveService? hiveService})
     : _hiveService = hiveService ?? HiveService.instance;
@@ -44,14 +53,20 @@ class TokenTrackingService {
       await _hiveService.usersBox.put(userId, updatedUser);
 
       // Store detailed usage record
-      await _storeUsageRecord(
+      final record = TokenUsageRecord(
+        id: requestId ?? DateTime.now().millisecondsSinceEpoch.toString(),
         userId: userId,
         promptTokens: promptTokens,
         completionTokens: completionTokens,
         cost: cost,
         model: model,
-        requestId: requestId,
+        timestamp: DateTime.now(),
+        requestType: 'api_call',
       );
+
+      // Store record and emit to stream
+      await _storeUsageRecord(record);
+      _controller.add(record);
 
       return const Right(null);
     } catch (e) {
@@ -202,28 +217,9 @@ class TokenTrackingService {
     return inputCost + outputCost;
   }
 
-  Future<void> _storeUsageRecord({
-    required String userId,
-    required int promptTokens,
-    required int completionTokens,
-    required double cost,
-    required String model,
-    String? requestId,
-  }) async {
+  Future<void> _storeUsageRecord(TokenUsageRecord record) async {
     // In a production app, you'd store this in a separate Hive box
     // For now, we'll just log it
-    final record = TokenUsageRecord(
-      id: requestId ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: userId,
-      promptTokens: promptTokens,
-      completionTokens: completionTokens,
-      cost: cost,
-      model: model,
-      timestamp: DateTime.now(),
-      requestType: 'api_call',
-    );
-
-    // TODO: Store in dedicated usage records box
     print('Usage Record: ${record.toJson()}');
   }
 

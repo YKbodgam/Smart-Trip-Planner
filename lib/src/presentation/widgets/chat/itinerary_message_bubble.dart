@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -7,6 +8,7 @@ import '../../../core/utils/screen_util_helper.dart';
 import '../../../domain/entities/itinerary.dart';
 
 class ItineraryMessageBubble extends StatelessWidget {
+  final Itinerary? previousItinerary;
   final Itinerary itinerary;
   final VoidCallback? onSaveOffline;
   final VoidCallback? onFollowUp;
@@ -14,15 +16,25 @@ class ItineraryMessageBubble extends StatelessWidget {
   const ItineraryMessageBubble({
     super.key,
     required this.itinerary,
+    this.previousItinerary,
     this.onSaveOffline,
     this.onFollowUp,
   });
 
   Future<void> _openInMaps() async {
-    // TODO: Open maps with itinerary locations
-    const url = 'https://maps.google.com/?q=Mumbai+to+Bali';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
+    // Extract first location from itinerary
+    final firstDay = itinerary.days.first;
+    final firstLocation = firstDay.items.firstWhere(
+      (item) => item.location != null,
+      orElse: () => firstDay.items.first,
+    );
+
+    final query = firstLocation.location ?? firstLocation.activity;
+    final url = 'https://maps.google.com/?q=${Uri.encodeComponent(query)}';
+
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
     }
   }
 
@@ -42,16 +54,12 @@ class ItineraryMessageBubble extends StatelessWidget {
               borderRadius: BorderRadius.circular(16.r),
             ),
             child: Center(
-              child: Icon(
-                Icons.smart_toy,
-                color: AppColors.white,
-                size: 16.w,
-              ),
+              child: Icon(Icons.smart_toy, color: AppColors.white, size: 16.w),
             ),
           ),
-          
+
           SizedBox(width: ScreenUtilHelper.spacing8),
-          
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,14 +75,18 @@ class ItineraryMessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 // Itinerary Content
                 Container(
                   padding: EdgeInsets.all(ScreenUtilHelper.spacing16),
                   decoration: BoxDecoration(
                     color: AppColors.aiMessageBg,
-                    borderRadius: BorderRadius.circular(ScreenUtilHelper.radius16),
-                    border: Border.all(color: AppColors.outline.withOpacity(0.2)),
+                    borderRadius: BorderRadius.circular(
+                      ScreenUtilHelper.radius16,
+                    ),
+                    border: Border.all(
+                      color: AppColors.outline.withOpacity(0.2),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,55 +95,108 @@ class ItineraryMessageBubble extends StatelessWidget {
                       if (itinerary.days.isNotEmpty)
                         Text(
                           itinerary.days.first.summary,
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            color: AppColors.onSurface,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: AppColors.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
-                      
+
                       SizedBox(height: ScreenUtilHelper.spacing16),
-                      
-                      // Activities List
+
+                      // Activities List with diff/highlight
                       if (itinerary.days.isNotEmpty)
-                        ...itinerary.days.first.items.map((item) => Padding(
-                          padding: EdgeInsets.only(bottom: ScreenUtilHelper.spacing8),
-                          child: Row(
+                        ...List.generate(itinerary.days.length, (dayIdx) {
+                          final day = itinerary.days[dayIdx];
+                          final prevDay =
+                              previousItinerary != null &&
+                                  previousItinerary!.days.length > dayIdx
+                              ? previousItinerary!.days[dayIdx]
+                              : null;
+                          return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 4.w,
-                                height: 4.w,
-                                margin: EdgeInsets.only(
-                                  top: 8.h,
-                                  right: ScreenUtilHelper.spacing8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.onSurface,
-                                  borderRadius: BorderRadius.circular(2.r),
-                                ),
-                              ),
-                              Expanded(
-                                child: RichText(
-                                  text: TextSpan(
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              Text(
+                                'Day ${dayIdx + 1}: ${day.summary}',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
                                       color: AppColors.onSurface,
+                                      fontWeight: FontWeight.w600,
                                     ),
+                              ),
+                              ...day.items.map((item) {
+                                final isNew =
+                                    prevDay == null ||
+                                    !prevDay.items.any(
+                                      (prevItem) =>
+                                          prevItem.activity == item.activity &&
+                                          prevItem.time == item.time,
+                                    );
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    bottom: ScreenUtilHelper.spacing8,
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      TextSpan(
-                                        text: '${item.time}: ',
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                      Container(
+                                        width: 4.w,
+                                        height: 4.w,
+                                        margin: EdgeInsets.only(
+                                          top: 8.h,
+                                          right: ScreenUtilHelper.spacing8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isNew
+                                              ? AppColors.success
+                                              : AppColors.onSurface,
+                                          borderRadius: BorderRadius.circular(
+                                            2.r,
+                                          ),
+                                        ),
                                       ),
-                                      TextSpan(text: item.activity),
+                                      Expanded(
+                                        child: RichText(
+                                          text: TextSpan(
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                                  color: isNew
+                                                      ? AppColors.success
+                                                      : AppColors.onSurface,
+                                                ),
+                                            children: [
+                                              if (isNew)
+                                                WidgetSpan(
+                                                  child: Icon(
+                                                    Icons.fiber_new,
+                                                    color: AppColors.success,
+                                                    size: 16.w,
+                                                  ),
+                                                ),
+                                              TextSpan(
+                                                text: '${item.time}: ',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              TextSpan(text: item.activity),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-                              ),
+                                );
+                              }),
                             ],
-                          ),
-                        )),
-                      
+                          );
+                        }),
+
                       SizedBox(height: ScreenUtilHelper.spacing16),
-                      
+
                       // Maps Link
                       InkWell(
                         onTap: _openInMaps,
@@ -145,10 +210,11 @@ class ItineraryMessageBubble extends StatelessWidget {
                             SizedBox(width: ScreenUtilHelper.spacing4),
                             Text(
                               'Open in maps',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.primary,
-                                decoration: TextDecoration.underline,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: AppColors.primary,
+                                    decoration: TextDecoration.underline,
+                                  ),
                             ),
                             SizedBox(width: ScreenUtilHelper.spacing4),
                             Icon(
@@ -159,35 +225,53 @@ class ItineraryMessageBubble extends StatelessWidget {
                           ],
                         ),
                       ),
-                      
+
                       SizedBox(height: ScreenUtilHelper.spacing8),
-                      
+
                       // Location Info
                       Container(
                         padding: EdgeInsets.all(ScreenUtilHelper.spacing12),
                         decoration: BoxDecoration(
                           color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(ScreenUtilHelper.radius8),
+                          borderRadius: BorderRadius.circular(
+                            ScreenUtilHelper.radius8,
+                          ),
                         ),
                         child: Text(
                           'Mumbai to Bali, Indonesia | 11hrs 5mins',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.onSurfaceVariant),
                         ),
                       ),
                     ],
                   ),
                 ),
-                
+
                 SizedBox(height: ScreenUtilHelper.spacing12),
-                
+
                 // Action Buttons
                 Row(
                   children: [
                     TextButton.icon(
                       onPressed: () {
-                        // TODO: Copy itinerary
+                        final text = itinerary.days
+                            .map((day) {
+                              final activities = day.items
+                                  .map((item) {
+                                    return '${item.time}: ${item.activity}';
+                                  })
+                                  .join('\n');
+                              return 'Day ${itinerary.days.indexOf(day) + 1}: ${day.summary}\n$activities';
+                            })
+                            .join('\n\n');
+
+                        Clipboard.setData(ClipboardData(text: text));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Itinerary copied to clipboard'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
                       },
                       icon: Icon(
                         Icons.copy_outlined,
@@ -201,7 +285,7 @@ class ItineraryMessageBubble extends StatelessWidget {
                         ),
                       ),
                     ),
-                    
+
                     TextButton.icon(
                       onPressed: onSaveOffline,
                       icon: Icon(
@@ -216,7 +300,7 @@ class ItineraryMessageBubble extends StatelessWidget {
                         ),
                       ),
                     ),
-                    
+
                     TextButton.icon(
                       onPressed: () {
                         // TODO: Regenerate itinerary
