@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/chat_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
 import '../../../domain/entities/chat_message.dart';
@@ -42,9 +43,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             .read(chatProvider(widget.itineraryId).notifier)
             .sendMessage(prompt);
         _messageController.clear();
-        _scrollToBottom();
-      }
-    });
+        _scrollToBottom(    );
+  }
+
+  Widget _buildAvatarText(BuildContext context, String text) {
+    return Center(
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: AppColors.onPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+});
   }
 
   @override
@@ -184,23 +197,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onPressed: () => context.pop(),
         ),
         actions: [
-          Container(
-            width: 40.w,
-            height: 40.w,
-            margin: EdgeInsets.only(right: ScreenUtilHelper.spacing16),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-            child: Center(
-              child: Text(
-                'S',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.onPrimary,
-                  fontWeight: FontWeight.w600,
+          Consumer(
+            builder: (context, ref, _) {
+              final user = ref.watch(authProvider).maybeWhen(
+                    authenticated: (user) => user,
+                    orElse: () => null,
+                  );
+              
+              final name = user?.displayName ?? (user?.email.split('@').first ?? 'T');
+              final avatarText = (name.isNotEmpty ? name[0] : 'T').toUpperCase();
+              final avatarUrl = user?.photoUrl;
+
+              return Container(
+                width: 40.w,
+                height: 40.w,
+                margin: EdgeInsets.only(right: ScreenUtilHelper.spacing16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(20.r),
                 ),
-              ),
-            ),
+                child: avatarUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(20.r),
+                        child: Image.network(
+                          avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildAvatarText(context, avatarText);
+                          },
+                        ),
+                      )
+                    : _buildAvatarText(context, avatarText),
+              );
+            },
           ),
         ],
       ),
@@ -350,6 +379,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarText(BuildContext context, String text) {
+    return Center(
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: AppColors.onPrimary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

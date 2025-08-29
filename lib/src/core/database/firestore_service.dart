@@ -32,6 +32,22 @@ class FirestoreService {
     }
   }
 
+  Future<UserModel?> getUserByEmail(String email) async {
+    try {
+      final querySnapshot = await _usersCollection
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+      
+      if (querySnapshot.docs.isEmpty) return null;
+      
+      final doc = querySnapshot.docs.first;
+      return UserModel.fromJson(doc.data());
+    } catch (e) {
+      throw DatabaseException(message: 'Failed to get user by email: $e');
+    }
+  }
+
   Future<UserModel> saveUser(UserModel user) async {
     try {
       await _usersCollection.doc(user.uid).set(user.toJson());

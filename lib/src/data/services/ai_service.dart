@@ -15,7 +15,7 @@ class AIService implements AIServiceRepository {
   final Dio _dio;
   final TokenTrackingService
   _tokenTrackingService; // Added token tracking service
-  static const String _model = 'gpt-4o-mini'; // Using more cost-effective model
+  static const String _model = 'gpt-4o-mini'; // Low-cost, current model
 
   AIService({
     Dio? dio,
@@ -29,6 +29,7 @@ class AIService implements AIServiceRepository {
     dio.options.baseUrl = EnvironmentConfig.openaiBaseUrl;
     dio.options.headers = {
       'Authorization': 'Bearer ${EnvironmentConfig.openaiApiKey}',
+      'OpenAI-Organization': EnvironmentConfig.openaiOrganizationId,
       'Content-Type': 'application/json',
     };
     dio.options.connectTimeout = const Duration(seconds: 30);
@@ -63,7 +64,7 @@ class AIService implements AIServiceRepository {
             'function': {'name': 'generate_itinerary'},
           },
           'temperature': 0.7,
-          'max_tokens': 4000,
+          'max_tokens': 1200,
         },
       );
 
@@ -131,7 +132,7 @@ class AIService implements AIServiceRepository {
             chatHistory,
           ),
           'temperature': 0.7,
-          'max_tokens': 2000,
+          'max_tokens': 800,
         },
       );
 
@@ -177,7 +178,7 @@ class AIService implements AIServiceRepository {
           'messages': _buildMessages(prompt, chatHistory, existingItinerary),
           'stream': true,
           'temperature': 0.7,
-          'max_tokens': 4000,
+          'max_tokens': 1200,
         },
       );
 
@@ -304,9 +305,12 @@ class AIService implements AIServiceRepository {
       },
     ];
 
-    // Add chat history
-    if (chatHistory != null) {
-      for (final message in chatHistory) {
+    // Add chat history (limit to last 6 to control tokens)
+    if (chatHistory != null && chatHistory.isNotEmpty) {
+      final limited = chatHistory.length > 6
+          ? chatHistory.sublist(chatHistory.length - 6)
+          : chatHistory;
+      for (final message in limited) {
         messages.add({
           'role': message.isUser ? 'user' : 'assistant',
           'content': message.content,
@@ -458,21 +462,60 @@ class AIService implements AIServiceRepository {
   }
 
   Either<Failure, T> _handleDioException<T>(DioException e) {
-    if (e.response?.statusCode == 429) {
+    final status = e.response?.statusCode;
+    final data = e.response?.data;
+    if (status == 429) {
+      final errMsg = data is Map && data['error'] is Map
+          ? (data['error']['message'] as String? ??
+                'Rate limit or quota exceeded')
+          : 'Rate limit or quota exceeded';
+      final errCode = data is Map && data['error'] is Map
+          ? data['error']['code'] as String?
+          : null;
+      if (errCode == 'insufficient_quota') {
+        return Left(
+          RateLimitFailure(
+            message:
+                'You have exceeded your current quota. Please check plan and billing.',
+            code: status,
+            details: errMsg,
+          ),
+        );
+      }
       return Left(
         RateLimitFailure(
-          message: 'Rate limit exceeded. Please try again later.',
+          message: 'Too many requests. Please try again later.',
+          code: status,
+          details: errMsg,
         ),
       );
-    } else if (e.response?.statusCode == 401) {
-      return Left(AuthenticationFailure(message: 'Invalid API key'));
-    } else if (e.response?.statusCode == 400) {
-      return Left(ValidationFailure(message: 'Invalid request parameters'));
+    } else if (status == 401) {
+      return Left(
+        AuthenticationFailure(
+          message: 'Invalid API key',
+          code: status,
+          details: data?.toString(),
+        ),
+      );
+    } else if (status == 400) {
+      return Left(
+        ValidationFailure(
+          message: 'Invalid request parameters',
+          code: status,
+          details: data?.toString(),
+        ),
+      );
     } else if (e.type == DioExceptionType.connectionTimeout) {
       return Left(NetworkFailure(message: 'Connection timeout'));
     } else if (e.type == DioExceptionType.receiveTimeout) {
       return Left(NetworkFailure(message: 'Response timeout'));
     }
-    return Left(AIServiceFailure(message: e.message ?? 'AI service error'));
+    return Left(
+      AIServiceFailure(
+        message: e.message ?? 'AI service error',
+        code: status,
+        details: data?.toString(),
+      ),
+    );
   }
 }

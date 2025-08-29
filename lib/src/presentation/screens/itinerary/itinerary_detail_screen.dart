@@ -201,23 +201,39 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
           onPressed: () => context.pop(),
         ),
         actions: [
-          Container(
-            width: 40.w,
-            height: 40.w,
-            margin: EdgeInsets.only(right: ScreenUtilHelper.spacing16),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-            child: Center(
-              child: Text(
-                'S',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.onPrimary,
-                  fontWeight: FontWeight.w600,
+          Consumer(
+            builder: (context, ref, _) {
+              final user = ref.watch(authProvider).maybeWhen(
+                    authenticated: (user) => user,
+                    orElse: () => null,
+                  );
+              
+              final name = user?.displayName ?? (user?.email.split('@').first ?? 'T');
+              final avatarText = (name.isNotEmpty ? name[0] : 'T').toUpperCase();
+              final avatarUrl = user?.photoUrl;
+
+              return Container(
+                width: 40.w,
+                height: 40.w,
+                margin: EdgeInsets.only(right: ScreenUtilHelper.spacing16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(20.r),
                 ),
-              ),
-            ),
+                child: avatarUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(20.r),
+                        child: Image.network(
+                          avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildAvatarText(context, avatarText);
+                          },
+                        ),
+                      )
+                    : _buildAvatarText(context, avatarText),
+              );
+            },
           ),
         ],
       ),
@@ -342,6 +358,18 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildAvatarText(BuildContext context, String text) {
+    return Center(
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: AppColors.onPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

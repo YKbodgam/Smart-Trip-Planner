@@ -16,9 +16,22 @@ class EnhancedAIService extends AIService {
   final WebSearchService _webSearchService;
 
   EnhancedAIService({Dio? dio, WebSearchService? webSearchService})
-    : _dio = dio ?? Dio(),
+    : _dio = dio ?? _createConfiguredDio(),
       _webSearchService = webSearchService ?? WebSearchService(),
-      super(dio: dio ?? Dio());
+      super(dio: dio ?? _createConfiguredDio());
+
+  static Dio _createConfiguredDio() {
+    final dio = Dio();
+    dio.options.baseUrl = EnvironmentConfig.openaiBaseUrl;
+    dio.options.headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${EnvironmentConfig.openaiApiKey}',
+      'OpenAI-Organization': EnvironmentConfig.openaiOrganizationId,
+    };
+    dio.options.connectTimeout = const Duration(seconds: 30);
+    dio.options.receiveTimeout = const Duration(seconds: 60);
+    return dio;
+  }
 
   @override
   Future<Either<Failure, Itinerary>> generateItinerary({
@@ -38,7 +51,7 @@ class EnhancedAIService extends AIService {
           location: searchContext['location']!,
           dateRange: searchContext['dateRange'],
           interests: searchContext['interests'] != null
-              ? [?searchContext['interests']]
+              ? [searchContext['interests']!]
               : [],
         );
 
@@ -100,11 +113,13 @@ class EnhancedAIService extends AIService {
   }) async {
     try {
       if (!EnvironmentConfig.isOpenAIConfigured) {
+        print('Debug: OpenAI API key not configured');
         return Left(
           ConfigurationFailure(message: 'OpenAI API key not configured'),
         );
       }
 
+      print('Debug: Building enhanced messages');
       final messages = _buildEnhancedMessages(
         prompt,
         chatHistory,
@@ -112,6 +127,9 @@ class EnhancedAIService extends AIService {
         searchResults,
       );
 
+      print(
+        'Debug: Sending POST request to /chat/completions with messages: $messages',
+      );
       final response = await _dio.post(
         '/chat/completions',
         data: {
@@ -123,29 +141,125 @@ class EnhancedAIService extends AIService {
             'function': {'name': 'generate_itinerary'},
           },
           'temperature': 0.7,
-          'max_tokens': 4000,
+          'max_tokens': 1200,
         },
       );
+      print('Debug: Received response: ${response.data}');
 
       final choice = response.data['choices'][0];
-      final toolCalls = choice['message']['tool_calls'];
+      final message = choice['message'] ?? {};
 
-      if (toolCalls != null && toolCalls.isNotEmpty) {
-        final toolCall = toolCalls[0];
-        if (toolCall['function']['name'] == 'generate_itinerary') {
-          final argumentsJson = toolCall['function']['arguments'];
-          final itineraryData = json.decode(argumentsJson);
-          final itinerary = _parseItineraryFromJson(itineraryData);
-          return Right(itinerary);
+      // Prefer modern tool_calls format
+      final toolCalls = message['tool_calls'];
+      if (toolCalls != null && toolCalls is List && toolCalls.isNotEmpty) {
+        final firstCall = toolCalls[0];
+        final function = firstCall['function'];
+        if (function != null && function['name'] == 'generate_itinerary') {
+          final argumentsJson = function['arguments'];
+          print('Debug: Tool call arguments: $argumentsJson');
+          try {
+            final itineraryData = json.decode(argumentsJson);
+            final itinerary = _parseItineraryFromJson(itineraryData);
+            print('Debug: Successfully parsed itinerary');
+            return Right(itinerary);
+          } catch (e) {
+            print('Debug: Error parsing itinerary data - ${e.toString()}');
+            return Left(
+              AIServiceFailure(
+                message: 'Failed to parse itinerary data: ${e.toString()}',
+              ),
+            );
+          }
         }
       }
 
+      // Legacy function_call fallback
+      final functionCall = message['function_call'];
+      if (functionCall != null &&
+          functionCall['name'] == 'generate_itinerary') {
+        final argumentsJson = functionCall['arguments'];
+        print('Debug: Legacy function call arguments: $argumentsJson');
+        try {
+          final itineraryData = json.decode(argumentsJson);
+          final itinerary = _parseItineraryFromJson(itineraryData);
+          print('Debug: Successfully parsed itinerary');
+          return Right(itinerary);
+        } catch (e) {
+          print('Debug: Error parsing itinerary data - ${e.toString()}');
+          return Left(
+            AIServiceFailure(
+              message: 'Failed to parse itinerary data: ${e.toString()}',
+            ),
+          );
+        }
+      }
+
+      print('Debug: No matching tool/function call for generate_itinerary');
       return Left(AIServiceFailure(message: 'Failed to generate itinerary'));
     } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      final data = e.response?.data;
+      print(
+        'Debug: DioException encountered - status: $status, message: ${e.message}, data: $data',
+      );
+
+      // Map common API errors to domain failures
+      if (status == 429) {
+        final errMsg = data is Map && data['error'] is Map
+            ? (data['error']['message'] as String? ??
+                  'Rate limit or quota exceeded')
+            : 'Rate limit or quota exceeded';
+        final errCode = data is Map && data['error'] is Map
+            ? data['error']['code'] as String?
+            : null;
+        if (errCode == 'insufficient_quota') {
+          return Left(
+            RateLimitFailure(
+              message:
+                  'You have exceeded your current quota. Please check plan and billing.',
+              code: status,
+              details: errMsg,
+            ),
+          );
+        }
+        return Left(
+          RateLimitFailure(
+            message: 'Too many requests. Please try again later.',
+            code: status,
+            details: errMsg,
+          ),
+        );
+      } else if (status == 401) {
+        return Left(
+          AuthenticationFailure(
+            message: 'Invalid API key',
+            code: status,
+            details: data?.toString(),
+          ),
+        );
+      } else if (status == 400) {
+        return Left(
+          ValidationFailure(
+            message: 'Invalid request parameters',
+            code: status,
+            details: data?.toString(),
+          ),
+        );
+      } else if (e.type == DioExceptionType.connectionTimeout) {
+        return Left(NetworkFailure(message: 'Connection timeout'));
+      } else if (e.type == DioExceptionType.receiveTimeout) {
+        return Left(NetworkFailure(message: 'Response timeout'));
+      }
+
       return Left(
-        AIServiceFailure(message: e.message ?? 'AI service error'),
-      ); // ✅ fixed
+        AIServiceFailure(
+          message: e.message ?? 'AI service error',
+          code: status,
+          details: data?.toString(),
+        ),
+      );
     } catch (e) {
+      print('Debug: Exception encountered - ${e.toString()}');
       return Left(UnknownFailure(message: e.toString()));
     }
   }
@@ -168,7 +282,7 @@ class EnhancedAIService extends AIService {
       },
     ];
 
-    // Add search context if available
+    // Add search context if available (trim to avoid token blowup)
     if (searchResults != null && searchResults.isNotEmpty) {
       final searchContext = _formatSearchResultsForAI(searchResults);
       messages.add({
@@ -178,9 +292,12 @@ class EnhancedAIService extends AIService {
       });
     }
 
-    // Add chat history
-    if (chatHistory != null) {
-      for (final message in chatHistory) {
+    // Add chat history (limit to last 6)
+    if (chatHistory != null && chatHistory.isNotEmpty) {
+      final limited = chatHistory.length > 6
+          ? chatHistory.sublist(chatHistory.length - 6)
+          : chatHistory;
+      for (final message in limited) {
         messages.add({
           'role': message.isUser ? 'user' : 'assistant',
           'content': message.content,
@@ -235,14 +352,24 @@ class EnhancedAIService extends AIService {
   ) {
     final buffer = StringBuffer();
 
+    int totalItems = 0;
     searchResults.forEach((category, results) {
-      if (results.isNotEmpty) {
+      if (results.isNotEmpty && totalItems < 9) {
         buffer.writeln('\n$category:');
         for (final result in results.take(3)) {
-          // Limit to top 3 results per category
-          buffer.writeln('- ${result.title}');
-          buffer.writeln('  ${result.snippet}');
-          buffer.writeln('  URL: ${result.url}');
+          if (totalItems >= 9) break;
+          final title = (result.title ?? '').toString();
+          final snippet = (result.snippet ?? '').toString();
+          final url = (result.url ?? '').toString();
+          buffer.writeln(
+            '- ${title.length > 120 ? title.substring(0, 117) + '...' : title}',
+          );
+          final trimmedSnippet = snippet.length > 160
+              ? snippet.substring(0, 157) + '...'
+              : snippet;
+          buffer.writeln('  $trimmedSnippet');
+          buffer.writeln('  URL: $url');
+          totalItems++;
         }
       }
     });

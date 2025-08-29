@@ -6,6 +6,8 @@ export 'app_environment.dart';
 @Deprecated('Use AppEnvironmentConfig instead')
 class EnvironmentConfig {
   static String get openaiApiKey => AppEnvironmentConfig.openaiApiKey;
+  static String get openaiOrganizationId =>
+      AppEnvironmentConfig.openaiOrganizationId;
   static String get openaiBaseUrl => AppEnvironmentConfig.openaiBaseUrl;
   static String get googleSearchApiKey =>
       AppEnvironmentConfig.googleSearchApiKey;

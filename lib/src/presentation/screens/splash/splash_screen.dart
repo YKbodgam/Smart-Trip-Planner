@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -52,15 +53,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _navigateToNextScreen() async {
     await Future.delayed(const Duration(milliseconds: 2500));
+    if (!mounted) return;
 
-    if (mounted) {
-      // Check if user is authenticated by trying to get the current Firebase user
-      final currentUser = await ref
-          .read(authProvider.notifier)
-          .getCurrentUser();
-      final route = currentUser != null ? '/home' : '/login';
-      context.go(route);
-    }
+    final authState = ref.read(authProvider);
+    if (!mounted) return;
+    authState.maybeWhen(
+      authenticated: (_) {
+        if (!mounted) return;
+        context.go('/home');
+      },
+      unauthenticated: () {
+        if (!mounted) return;
+        context.go('/login');
+      },
+      orElse: () {},
+    );
   }
 
   @override
@@ -85,25 +92,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // App Icon/Logo
-                    Container(
-                      width: 80.w,
-                      height: 80.w,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(20.r),
-                      ),
-                      child: Icon(
-                        Icons.flight_takeoff,
-                        size: 40.w,
-                        color: AppColors.onPrimary,
+                    SizedBox(
+                      height: 140.w,
+                      width: 140.w,
+                      child: SvgPicture.asset(
+                        'assets/icons/icn_logo.svg',
+                        fit: BoxFit.cover,
                       ),
                     ),
 
-                    SizedBox(height: ScreenUtilHelper.spacing24),
+                    SizedBox(height: ScreenUtilHelper.spacing20),
 
                     // App Name
                     Text(
-                      'Itinera AI',
+                      'Itinerary AI',
                       style: Theme.of(context).textTheme.displayMedium
                           ?.copyWith(
                             color: AppColors.primary,

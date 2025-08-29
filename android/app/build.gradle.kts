@@ -14,12 +14,12 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_18
-        targetCompatibility = JavaVersion.VERSION_18
+        sourceCompatibility = JavaVersion.VERSION_17 // Required by Gradle 9.0+
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_18.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -31,6 +31,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -39,9 +40,28 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
+
+        // release {
+        //     isMinifyEnabled = true
+        //     proguardFiles(
+        //         getDefaultProguardFile("proguard-android-optimize.txt"),
+        //         "proguard-rules.pro"
+        //     )
+        // }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // This dependency is used by the application.
+    implementation("com.google.guava:guava:33.2.1-jre")
+
+    // Use JUnit Jupiter for unit tests.
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
+
+    // The org.jetbrains.kotlin.jvm plugin requires the kotlin-stdlib dependency.
+    implementation(kotlin("stdlib"))
 }

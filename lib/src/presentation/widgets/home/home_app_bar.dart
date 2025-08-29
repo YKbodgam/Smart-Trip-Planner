@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
+import '../../providers/auth_provider.dart';
 
-class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
+class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final VoidCallback onProfileTap;
 
   const HomeAppBar({
@@ -13,7 +15,16 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).maybeWhen(
+          authenticated: (user) => user,
+          orElse: () => null,
+        );
+    
+    final name = user?.displayName ?? (user?.email.split('@').first ?? 'T');
+    final avatarText = (name.isNotEmpty ? name[0] : 'T').toUpperCase();
+    final avatarUrl = user?.photoUrl;
+
     return AppBar(
       backgroundColor: AppColors.background,
       elevation: 0,
@@ -46,18 +57,33 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
               color: AppColors.primary,
               borderRadius: BorderRadius.circular(20.r),
             ),
-            child: Center(
-              child: Text(
-                'S',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.onPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+            child: avatarUrl != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(20.r),
+                    child: Image.network(
+                      avatarUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _buildAvatarText(context, avatarText);
+                      },
+                    ),
+                  )
+                : _buildAvatarText(context, avatarText),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAvatarText(BuildContext context, String text) {
+    return Center(
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: AppColors.onPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 

@@ -5,6 +5,7 @@ import '../entities/user.dart';
 
 abstract class UserRepository {
   Future<Either<Failure, User?>> getCurrentUser();
+  Future<Either<Failure, User?>> getUserByEmail(String email);
   Future<Either<Failure, User>> saveUser(User user);
   Future<Either<Failure, User>> updateUser(User user);
   Future<Either<Failure, void>> deleteUser(String uid);

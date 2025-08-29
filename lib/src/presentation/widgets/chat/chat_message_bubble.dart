@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
 import '../../../domain/entities/chat_message.dart';
+import '../../providers/auth_provider.dart';
 
-class ChatMessageBubble extends StatelessWidget {
+class ChatMessageBubble extends ConsumerWidget {
   final ChatMessage message;
 
   const ChatMessageBubble({super.key, required this.message});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref
+        .watch(authProvider)
+        .maybeWhen(authenticated: (user) => user, orElse: () => null);
+
+    final name = user?.displayName ?? (user?.email.split('@').first ?? 'T');
+    final avatarText = (name.isNotEmpty ? name[0] : 'T').toUpperCase();
+    final avatarUrl = user?.photoUrl;
+
     return Padding(
       padding: EdgeInsets.symmetric(vertical: ScreenUtilHelper.spacing8),
       child: Row(
@@ -49,7 +59,7 @@ class ChatMessageBubble extends StatelessWidget {
                   Padding(
                     padding: EdgeInsets.only(bottom: ScreenUtilHelper.spacing4),
                     child: Text(
-                      'Itinera AI',
+                      'Itinerary AI',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: AppColors.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
@@ -140,18 +150,33 @@ class ChatMessageBubble extends StatelessWidget {
                 color: AppColors.primary,
                 borderRadius: BorderRadius.circular(16.r),
               ),
-              child: Center(
-                child: Text(
-                  'S',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.onPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              child: avatarUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(16.r),
+                      child: Image.network(
+                        avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildAvatarText(context, avatarText);
+                        },
+                      ),
+                    )
+                  : _buildAvatarText(context, avatarText),
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarText(BuildContext context, String text) {
+    return Center(
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: AppColors.onPrimary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

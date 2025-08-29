@@ -5,15 +5,23 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+
 import 'app.dart';
 import 'firebase_options.dart';
+import 'src/core/config/app_config.dart';
 
 Future<void> main() async {
-  // Ensure Flutter engine is initialized before any async work
-  WidgetsFlutterBinding.ensureInitialized();
+  // Ensure Flutter engine is initialized before any async code
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+
+  // Show splash screen until initialization is complete
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   try {
     await dotenv.load();
+
+    AppConfig.initialize();
 
     // 3. Initialize Firebase (only if enabled in config)
     await Firebase.initializeApp(
@@ -28,6 +36,9 @@ Future<void> main() async {
 
     // 4. Lock orientation
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+    // Remove splash and launch the app
+    FlutterNativeSplash.remove();
 
     runApp(const ProviderScope(child: MyApp()));
   }

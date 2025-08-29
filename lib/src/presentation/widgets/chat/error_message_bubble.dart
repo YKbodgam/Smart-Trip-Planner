@@ -30,16 +30,12 @@ class ErrorMessageBubble extends StatelessWidget {
               borderRadius: BorderRadius.circular(16.r),
             ),
             child: Center(
-              child: Icon(
-                Icons.smart_toy,
-                color: AppColors.white,
-                size: 16.w,
-              ),
+              child: Icon(Icons.smart_toy, color: AppColors.white, size: 16.w),
             ),
           ),
-          
+
           SizedBox(width: ScreenUtilHelper.spacing8),
-          
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,20 +44,22 @@ class ErrorMessageBubble extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.only(bottom: ScreenUtilHelper.spacing4),
                   child: Text(
-                    'Itinera AI',
+                    'Itinerary AI',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: AppColors.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                
+
                 // Error Bubble
                 Container(
                   padding: EdgeInsets.all(ScreenUtilHelper.spacing16),
                   decoration: BoxDecoration(
                     color: AppColors.errorContainer.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(ScreenUtilHelper.radius16),
+                    borderRadius: BorderRadius.circular(
+                      ScreenUtilHelper.radius16,
+                    ),
                     border: Border.all(color: AppColors.error.withOpacity(0.3)),
                   ),
                   child: Column(
@@ -78,23 +76,22 @@ class ErrorMessageBubble extends StatelessWidget {
                               borderRadius: BorderRadius.circular(4.r),
                             ),
                           ),
-                          
+
                           SizedBox(width: ScreenUtilHelper.spacing8),
-                          
+
                           Expanded(
                             child: Text(
                               message,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.error,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: AppColors.error),
                             ),
                           ),
                         ],
                       ),
-                      
+
                       if (onRegenerate != null) ...[
                         SizedBox(height: ScreenUtilHelper.spacing12),
-                        
+
                         // Regenerate Button
                         TextButton.icon(
                           onPressed: onRegenerate,
@@ -105,9 +102,8 @@ class ErrorMessageBubble extends StatelessWidget {
                           ),
                           label: Text(
                             'Regenerate',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.primary,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppColors.primary),
                           ),
                           style: TextButton.styleFrom(
                             padding: EdgeInsets.symmetric(

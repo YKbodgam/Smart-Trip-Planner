@@ -14,10 +14,10 @@ final itineraryDetailProvider =
     StateNotifierProvider.family<
       ItineraryDetailNotifier,
       ItineraryDetailState,
-      int
+      String
     >((ref, id) {
       final repository = ref.watch(itineraryRepositoryProvider);
-      return ItineraryDetailNotifier(repository, id);
+      return ItineraryDetailNotifier(repository, int.tryParse(id) ?? 0);
     });
 
 class ItineraryListNotifier extends StateNotifier<ItineraryListState> {
@@ -59,8 +59,8 @@ class ItineraryListNotifier extends StateNotifier<ItineraryListState> {
     );
   }
 
-  Future<void> deleteItinerary(int id) async {
-    final result = await _repository.deleteItinerary(id);
+  Future<void> deleteItinerary(String id) async {
+    final result = await _repository.deleteItinerary(int.tryParse(id) ?? 0);
     result.fold(
       (failure) => state = ItineraryListState.error(failure.message),
       (_) {
@@ -70,8 +70,8 @@ class ItineraryListNotifier extends StateNotifier<ItineraryListState> {
     );
   }
 
-  Future<void> markOffline(int id) async {
-    final result = await _repository.markItineraryOffline(id);
+  Future<void> markOffline(String id) async {
+    final result = await _repository.markItineraryOffline(int.tryParse(id) ?? 0);
     result.fold(
       (failure) => state = ItineraryListState.error(failure.message),
       (_) {
@@ -124,6 +124,24 @@ class ItineraryListState {
   const factory ItineraryListState.loaded(List<Itinerary> itineraries) =
       _ItineraryListLoaded;
   const factory ItineraryListState.error(String message) = _ItineraryListError;
+
+  T maybeWhen<T>({
+    T Function()? loading,
+    T Function(List<Itinerary> itineraries)? loaded,
+    T Function(String message)? error,
+    required T Function() orElse,
+  }) {
+    if (this is _ItineraryListLoading && loading != null) {
+      return loading();
+    } else if (this is _ItineraryListLoaded && loaded != null) {
+      final s = this as _ItineraryListLoaded;
+      return loaded(s.itineraries);
+    } else if (this is _ItineraryListError && error != null) {
+      final s = this as _ItineraryListError;
+      return error(s.message);
+    }
+    return orElse();
+  }
 }
 
 class _ItineraryListLoading extends ItineraryListState {

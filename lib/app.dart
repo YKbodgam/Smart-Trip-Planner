@@ -21,7 +21,7 @@ class MyApp extends ConsumerWidget {
       splitScreenMode: true,
       builder: (_, _) {
         return MaterialApp.router(
-          title: 'Pathoria',
+          title: 'Itinerary AI',
           debugShowMaterialGrid: false,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,

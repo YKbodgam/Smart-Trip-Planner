@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/database/hive_service.dart';
 import '../../core/database/firestore_service.dart';
@@ -55,6 +56,52 @@ class UserRepositoryImpl implements UserRepository {
     return userModels.first;
   }
 
+  @override
+  Future<Either<Failure, User?>> getUserByEmail(String email) async {
+    try {
+      debugPrint('🔍 Searching for user by email: $email');
+
+      // First try to get from local storage
+      final localUsers = _hiveService.usersBox.values.toList();
+      UserModel? localUser;
+      try {
+        localUser = localUsers.firstWhere(
+          (user) => user.email.toLowerCase() == email.toLowerCase(),
+        );
+      } catch (_) {
+        localUser = null;
+      }
+
+      if (localUser != null) {
+        debugPrint('✅ User found locally: ${localUser.uid}');
+        return Right(localUser.toEntity());
+      }
+
+      // If online, try to get from cloud
+      if (await _isOnline()) {
+        debugPrint('🌐 Searching cloud for user with email: $email');
+        final cloudUser = await _firestoreService.getUserByEmail(email);
+        if (cloudUser != null) {
+          debugPrint('✅ User found in cloud: ${cloudUser.uid}');
+          // Save to local storage for future use
+          await _hiveService.usersBox.put(cloudUser.uid, cloudUser);
+          return Right(cloudUser.toEntity());
+        }
+      }
+
+      debugPrint('❌ No user found with email: $email');
+      return const Right(null);
+    } on DatabaseException catch (e) {
+      debugPrint(
+        '❌ Database exception while searching user by email: ${e.message}',
+      );
+      return Left(DatabaseFailure(message: e.message));
+    } catch (e) {
+      debugPrint('❌ Unexpected error while searching user by email: $e');
+      return Left(UnknownFailure(message: e.toString()));
+    }
+  }
+
   Future<bool> _isOnline() async {
     final connectivityResult = await _connectivity.checkConnectivity();
     return connectivityResult != ConnectivityResult.none;
@@ -63,20 +110,28 @@ class UserRepositoryImpl implements UserRepository {
   @override
   Future<Either<Failure, User>> saveUser(User user) async {
     try {
+      debugPrint('💾 Attempting to save user: ${user.uid}');
       final userModel = UserModel.fromEntity(user);
 
       // Save locally
       await _hiveService.usersBox.put(userModel.uid, userModel);
+      debugPrint('✅ User saved locally: ${user.uid}');
 
       // If online, save to cloud
       if (await _isOnline()) {
+        debugPrint('🌐 User is online, saving to cloud: ${user.uid}');
         await _firestoreService.saveUser(userModel);
+        debugPrint('✅ User saved to cloud: ${user.uid}');
+      } else {
+        debugPrint('📱 User is offline, only saved locally: ${user.uid}');
       }
 
       return Right(userModel.toEntity());
     } on DatabaseException catch (e) {
+      debugPrint('❌ Database exception while saving user: ${e.message}');
       return Left(DatabaseFailure(message: e.message));
     } catch (e) {
+      debugPrint('❌ Unexpected error while saving user: $e');
       return Left(UnknownFailure(message: e.toString()));
     }
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_svg/svg.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
@@ -43,34 +44,10 @@ class GoogleSignInButton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Google Icon (using a simple colored container as placeholder)
-                  Container(
-                    width: 20.w,
-                    height: 20.w,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4.r),
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF4285F4),
-                          Color(0xFF34A853),
-                          Color(0xFFFBBC05),
-                          Color(0xFFEA4335),
-                        ],
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'G',
-                        style: TextStyle(
-                          color: AppColors.white,
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  
+                  SvgPicture.asset('assets/icons/icn_google.svg', height: 20.w),
+
                   SizedBox(width: ScreenUtilHelper.spacing12),
-                  
+
                   Text(
                     text,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(

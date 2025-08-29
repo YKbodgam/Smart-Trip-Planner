@@ -1,25 +1,19 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppEnvironmentConfig {
-  static final String openaiApiKey = String.fromEnvironment(
-    dotenv.env['OPENAI_API_KEY']!,
-    defaultValue: '',
-  );
+  static final String openaiApiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
 
-  static final String openaiBaseUrl = String.fromEnvironment(
-    dotenv.env['OPENAI_BASE_URL']!,
-    defaultValue: 'https://api.openai.com/v1',
-  );
+  static final String openaiOrganizationId =
+      dotenv.env['OPENAI_ORGANIZATION_ID'] ?? '';
 
-  static final String googleSearchApiKey = String.fromEnvironment(
-    dotenv.env['GOOGLE_SEARCH_API_KEY']!,
-    defaultValue: '',
-  );
+  static final String openaiBaseUrl =
+      dotenv.env['OPENAI_BASE_URL'] ?? 'https://api.openai.com/v1';
 
-  static final String googleSearchEngineId = String.fromEnvironment(
-    dotenv.env['GOOGLE_SEARCH_ENGINE_ID']!,
-    defaultValue: '',
-  );
+  static final String googleSearchApiKey =
+      dotenv.env['GOOGLE_SEARCH_API_KEY'] ?? '';
+
+  static final String googleSearchEngineId =
+      dotenv.env['GOOGLE_SEARCH_ENGINE_ID'] ?? '';
 
   static const bool enableAnalytics = bool.fromEnvironment(
     'ENABLE_ANALYTICS',

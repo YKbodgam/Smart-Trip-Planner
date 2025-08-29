@@ -20,6 +20,9 @@ class HiveService {
   Box<ChatMessageModel>? _chatMessagesBox;
 
   Box<ItineraryModel> get itinerariesBox {
+    _itinerariesBox ??= Hive.isBoxOpen(_itinerariesBoxName)
+        ? Hive.box<ItineraryModel>(_itinerariesBoxName)
+        : null;
     if (_itinerariesBox == null || !_itinerariesBox!.isOpen) {
       throw Exception('Itineraries box is not initialized');
     }
@@ -27,6 +30,9 @@ class HiveService {
   }
 
   Box<UserModel> get usersBox {
+    _usersBox ??= Hive.isBoxOpen(_usersBoxName)
+        ? Hive.box<UserModel>(_usersBoxName)
+        : null;
     if (_usersBox == null || !_usersBox!.isOpen) {
       throw Exception('Users box is not initialized');
     }
@@ -34,6 +40,9 @@ class HiveService {
   }
 
   Box<ChatMessageModel> get chatMessagesBox {
+    _chatMessagesBox ??= Hive.isBoxOpen(_chatMessagesBoxName)
+        ? Hive.box<ChatMessageModel>(_chatMessagesBoxName)
+        : null;
     if (_chatMessagesBox == null || !_chatMessagesBox!.isOpen) {
       throw Exception('Chat messages box is not initialized');
     }

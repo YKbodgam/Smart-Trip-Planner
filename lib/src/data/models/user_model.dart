@@ -1,6 +1,7 @@
 import 'package:hive/hive.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart'; // Added for debugPrint
 
 import '../../domain/entities/user.dart';
 
@@ -72,11 +73,12 @@ class UserModel extends Equatable {
   Map<String, dynamic> toJson() => _$UserModelToJson(this);
 
   factory UserModel.fromEntity(User entity) {
+    debugPrint('🔄 Converting User entity to UserModel: ${entity.uid}');
+    final id = entity.id ?? DateTime.now().millisecondsSinceEpoch.toString();
+    debugPrint('🆔 Generated ID: $id');
+    
     return UserModel(
-      id:
-          entity.id ??
-          DateTime.now().millisecondsSinceEpoch
-              .toString(), // Generate string ID if null
+      id: id,
       uid: entity.uid,
       email: entity.email,
       displayName: entity.displayName,

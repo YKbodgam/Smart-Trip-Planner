@@ -68,7 +68,7 @@ class ItineraryMessageBubble extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.only(bottom: ScreenUtilHelper.spacing4),
                   child: Text(
-                    'Itinera AI',
+                    'Itinerary AI',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: AppColors.onSurfaceVariant,
                       fontWeight: FontWeight.w500,

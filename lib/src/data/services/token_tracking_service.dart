@@ -123,9 +123,9 @@ class TokenTrackingService {
           cost: _calculateCost(
             promptTokens: 50,
             completionTokens: 25,
-            model: 'gpt-4o-mini',
+            model: 'gpt-3.5-turbo',
           ),
-          model: 'gpt-4o-mini',
+          model: 'gpt-3.5-turbo',
           timestamp: DateTime.now().subtract(const Duration(hours: 2)),
           requestType: 'itinerary_generation',
         ),
@@ -137,9 +137,9 @@ class TokenTrackingService {
           cost: _calculateCost(
             promptTokens: 30,
             completionTokens: 45,
-            model: 'gpt-4o-mini',
+            model: 'gpt-3.5-turbo',
           ),
-          model: 'gpt-4o-mini',
+          model: 'gpt-3.5-turbo',
           timestamp: DateTime.now().subtract(const Duration(hours: 5)),
           requestType: 'itinerary_refinement',
         ),
@@ -196,7 +196,7 @@ class TokenTrackingService {
     double outputPrice;
 
     switch (model.toLowerCase()) {
-      case 'gpt-4o-mini':
+      case 'gpt-3.5-turbo':
         inputPrice = _gpt4oMiniInputPrice;
         outputPrice = _gpt4oMiniOutputPrice;
         break;
@@ -206,7 +206,7 @@ class TokenTrackingService {
         outputPrice = _gpt4OutputPrice;
         break;
       default:
-        // Default to GPT-4o-mini pricing
+        // Default to gpt-3.5-turbo pricing
         inputPrice = _gpt4oMiniInputPrice;
         outputPrice = _gpt4oMiniOutputPrice;
     }

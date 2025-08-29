@@ -36,7 +36,7 @@ class ProfileScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _handleLogout(BuildContext context) async {
+  Future<void> _handleLogout(BuildContext context, WidgetRef ref) async {
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -57,7 +57,8 @@ class ProfileScreen extends ConsumerWidget {
     );
 
     if (shouldLogout == true && context.mounted) {
-      context.go('/login');
+      await ref.read(authProvider.notifier).signOut();
+      // Navigation will be handled automatically by the router
     }
   }
 
@@ -71,7 +72,7 @@ class ProfileScreen extends ConsumerWidget {
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => context.pop(),
         ),
         actions: [
@@ -94,24 +95,53 @@ class ProfileScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(height: ScreenUtilHelper.spacing24),
-            const ProfileHeader(
-              name: 'Shubham S.',
-              email: 'shubham.s@gmail.com',
-              avatarText: 'S',
+            Consumer(
+              builder: (context, ref, _) {
+                final user =
+                    ref
+                        .watch(authProvider)
+                        .maybeWhen(
+                          authenticated: (user) => user,
+                          orElse: () => null,
+                        ) ??
+                    null;
+                final name =
+                    user?.displayName ??
+                    (user?.email.split('@').first ?? 'Traveler');
+                final email = user?.email ?? '';
+                final avatarText = (name.isNotEmpty ? name[0] : 'T')
+                    .toUpperCase();
+                return ProfileHeader(
+                  name: name,
+                  email: email,
+                  avatarText: avatarText,
+                  avatarUrl: user?.photoUrl,
+                );
+              },
             ),
             SizedBox(height: ScreenUtilHelper.spacing32),
-            TokenUsageCard(
-              title: 'Request Tokens',
-              used: 100,
-              total: 1000,
-              color: AppColors.primary,
+            Consumer(
+              builder: (context, ref, _) {
+                final stats = ref.watch(tokenUsageStatsProvider);
+                return TokenUsageCard(
+                  title: 'Request Tokens',
+                  used: stats.requestTokensUsed,
+                  total: stats.requestTokensLimit,
+                  color: AppColors.primary,
+                );
+              },
             ),
             SizedBox(height: ScreenUtilHelper.spacing16),
-            TokenUsageCard(
-              title: 'Response Tokens',
-              used: 75,
-              total: 1000,
-              color: AppColors.error,
+            Consumer(
+              builder: (context, ref, _) {
+                final stats = ref.watch(tokenUsageStatsProvider);
+                return TokenUsageCard(
+                  title: 'Response Tokens',
+                  used: stats.responseTokensUsed,
+                  total: stats.responseTokensLimit,
+                  color: AppColors.error,
+                );
+              },
             ),
             SizedBox(height: ScreenUtilHelper.spacing16),
             Container(
@@ -147,7 +177,7 @@ class ProfileScreen extends ConsumerWidget {
             CustomButton(
               text: 'Log Out',
               type: ButtonType.outline,
-              onPressed: () => _handleLogout(context),
+              onPressed: () => _handleLogout(context, ref),
               icon: Icons.logout,
             ),
             SizedBox(height: ScreenUtilHelper.spacing24),
@@ -192,7 +222,7 @@ class ProfileScreen extends ConsumerWidget {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Model: GPT-4o-mini'),
+                            Text('Model: gpt-3.5-turbo'),
                             Text(
                               'Request Tokens: ${tokenStats.requestTokensUsed}/${tokenStats.requestTokensLimit}',
                             ),

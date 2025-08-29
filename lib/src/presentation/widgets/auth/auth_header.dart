@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_svg/svg.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
@@ -8,11 +9,7 @@ class AuthHeader extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const AuthHeader({
-    super.key,
-    required this.title,
-    required this.subtitle,
-  });
+  const AuthHeader({super.key, required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -22,14 +19,18 @@ class AuthHeader extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.flight_takeoff,
-              size: 24.w,
-              color: AppColors.primary,
+            SizedBox(
+              width: 50.w,
+              height: 50.w,
+              child: SvgPicture.asset(
+                'assets/icons/icn_logo.svg',
+                fit: BoxFit.contain,
+              ),
             ),
+
             SizedBox(width: ScreenUtilHelper.spacing8),
             Text(
-              'Itinera AI',
+              'Itinerary AI',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
@@ -37,9 +38,9 @@ class AuthHeader extends StatelessWidget {
             ),
           ],
         ),
-        
+
         SizedBox(height: ScreenUtilHelper.spacing32),
-        
+
         // Title
         Text(
           title,
@@ -49,15 +50,15 @@ class AuthHeader extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
-        
+
         SizedBox(height: ScreenUtilHelper.spacing8),
-        
+
         // Subtitle
         Text(
           subtitle,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: AppColors.onSurfaceVariant,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(color: AppColors.onSurfaceVariant),
           textAlign: TextAlign.center,
         ),
       ],

@@ -29,7 +29,7 @@ class CustomButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final buttonHeight = height ?? 48.h;
-    
+
     Widget child = isLoading
         ? SizedBox(
             width: 20.w,
@@ -37,7 +37,9 @@ class CustomButton extends StatelessWidget {
             child: CircularProgressIndicator(
               strokeWidth: 2,
               valueColor: AlwaysStoppedAnimation<Color>(
-                type == ButtonType.primary ? AppColors.onPrimary : AppColors.primary,
+                type == ButtonType.primary
+                    ? AppColors.onPrimary
+                    : AppColors.primary,
               ),
             ),
           )
@@ -46,16 +48,14 @@ class CustomButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 20.w,
-                ),
+                Icon(icon, size: 20.w),
                 SizedBox(width: ScreenUtilHelper.spacing8),
               ],
               Text(
                 text,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -81,7 +81,7 @@ class CustomButton extends StatelessWidget {
             child: child,
           ),
         );
-        
+
       case ButtonType.secondary:
         return SizedBox(
           width: width ?? double.infinity,
@@ -101,7 +101,7 @@ class CustomButton extends StatelessWidget {
             child: child,
           ),
         );
-        
+
       case ButtonType.outline:
         return SizedBox(
           width: width ?? double.infinity,
@@ -112,7 +112,9 @@ class CustomButton extends StatelessWidget {
               foregroundColor: AppColors.primary,
               disabledForegroundColor: AppColors.primary.withOpacity(0.6),
               side: BorderSide(
-                color: isLoading ? AppColors.primary.withOpacity(0.6) : AppColors.primary,
+                color: isLoading
+                    ? AppColors.primary.withOpacity(0.6)
+                    : AppColors.primary,
                 width: 1.5,
               ),
               shape: RoundedRectangleBorder(
@@ -122,7 +124,7 @@ class CustomButton extends StatelessWidget {
             child: child,
           ),
         );
-        
+
       case ButtonType.text:
         return SizedBox(
           width: width,
