@@ -25,8 +25,5 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 });
 
 final aiServiceRepositoryProvider = Provider<AIServiceRepository>((ref) {
-  if (AppEnvironmentConfig.isGoogleSearchConfigured) {
-    return EnhancedAIService(webSearchService: WebSearchService());
-  }
-  return AIService();
+  return EnhancedAIService(webSearchService: WebSearchService());
 });

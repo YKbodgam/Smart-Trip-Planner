@@ -18,7 +18,7 @@ class WebSearchService {
     if (cuisine != null) query += ' $cuisine cuisine';
     if (priceRange != null) query += ' $priceRange';
 
-    return _performSearch(query, 'restaurant');
+    return performSearch(query, 'restaurant');
   }
 
   Future<Either<Failure, List<SearchResult>>> searchHotels({
@@ -30,7 +30,7 @@ class WebSearchService {
     if (budget != null) query += ' $budget budget';
     if (type != null) query += ' $type';
 
-    return _performSearch(query, 'hotel');
+    return performSearch(query, 'hotel');
   }
 
   Future<Either<Failure, List<SearchResult>>> searchAttractions({
@@ -40,7 +40,7 @@ class WebSearchService {
     String query = 'top attractions things to do in $location';
     if (category != null) query += ' $category';
 
-    return _performSearch(query, 'attraction');
+    return performSearch(query, 'attraction');
   }
 
   Future<Either<Failure, List<SearchResult>>> searchTransportation({
@@ -51,7 +51,7 @@ class WebSearchService {
     String query = 'transportation from $from to $to';
     if (mode != null) query += ' $mode';
 
-    return _performSearch(query, 'transportation');
+    return performSearch(query, 'transportation');
   }
 
   Future<Either<Failure, List<SearchResult>>> searchWeatherInfo({
@@ -61,7 +61,7 @@ class WebSearchService {
     String query = 'weather in $location';
     if (dateRange != null) query += ' $dateRange';
 
-    return _performSearch(query, 'weather');
+    return performSearch(query, 'weather');
   }
 
   Future<Either<Failure, List<SearchResult>>> searchLocalEvents({
@@ -73,10 +73,10 @@ class WebSearchService {
     if (dateRange != null) query += ' $dateRange';
     if (eventType != null) query += ' $eventType';
 
-    return _performSearch(query, 'event');
+    return performSearch(query, 'event');
   }
 
-  Future<Either<Failure, List<SearchResult>>> _performSearch(
+  Future<Either<Failure, List<SearchResult>>> performSearch(
     String query,
     String category,
   ) async {
@@ -186,7 +186,7 @@ class WebSearchService {
       // Search for specific interests
       if (interests != null && interests.isNotEmpty) {
         for (final interest in interests) {
-          final interestResult = await _performSearch(
+          final interestResult = await performSearch(
             '$interest in $location',
             'interest',
           );

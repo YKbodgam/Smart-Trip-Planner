@@ -16,6 +16,7 @@ import '../../widgets/chat/itinerary_message_bubble.dart';
 import '../../widgets/chat/loading_message_bubble.dart';
 import '../../widgets/chat/error_message_bubble.dart';
 import '../../widgets/chat/typing_indicator_bubble.dart';
+import '../../../data/services/web_search_service.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String? itineraryId;
@@ -253,25 +254,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   else
                     ChatMessageBubble(message: message),
 
+                // Remove GoogleSearchResultsBubble and List<SearchResult> logic
                 if (itinerary != null)
-                  ItineraryMessageBubble(
-                    itinerary: itinerary,
-                    onSaveOffline: () {
-                      // Optional UX hook (repos already handle persistence as needed)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Itinerary ready — saved entry available in Trips.',
-                          ),
-                          backgroundColor: AppColors.success,
-                        ),
-                      );
-                    },
-                    onFollowUp: () {
-                      // focus management for follow-up prompt (kept minimal)
-                      FocusScope.of(context).unfocus();
-                    },
-                  ),
+                  ItineraryMessageBubble(itinerary: itinerary),
 
                 if (isThinking)
                   state.maybeWhen(
