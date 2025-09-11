@@ -25,7 +25,7 @@
     </tr>
     <tr>
       <td><img src="assets\images\inspiration\followup.png" alt="Search Interface" width="250"/></td>
-      <td><img src="assets\images\inspiration\limit.png" alt="Chat Interface" width="250" height="380"/></td>
+      <td><img src="assets\images\inspiration\limit.png" alt="Chat Interface" width="250"/></td>
     </tr>
     <tr>
       <td align="center"><b>AI Search Interface</b></td>
