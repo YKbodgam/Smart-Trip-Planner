@@ -1,19 +1,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppEnvironmentConfig {
-  static final String openaiApiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
-
-  static final String openaiOrganizationId =
-      dotenv.env['OPENAI_ORGANIZATION_ID'] ?? '';
-
-  static final String openaiBaseUrl =
-      dotenv.env['OPENAI_BASE_URL'] ?? 'https://api.openai.com/v1';
-
-  static final String googleSearchApiKey =
-      dotenv.env['GOOGLE_SEARCH_API_KEY'] ?? '';
-
-  static final String googleSearchEngineId =
-      dotenv.env['GOOGLE_SEARCH_ENGINE_ID'] ?? '';
+  static final String groqApiKey = dotenv.env['GROQ_API_KEY'] ?? '';
 
   static const bool enableAnalytics = bool.fromEnvironment(
     'ENABLE_ANALYTICS',
@@ -46,21 +34,14 @@ class AppEnvironmentConfig {
       ) ??
       50.0;
 
-  static bool get isOpenAIConfigured => openaiApiKey.isNotEmpty;
-
-  static bool get isGoogleSearchConfigured =>
-      googleSearchApiKey.isNotEmpty && googleSearchEngineId.isNotEmpty;
+  static bool get isGroqConfigured => groqApiKey.isNotEmpty;
 
   // Validation methods
   static List<String> validateConfiguration() {
     final errors = <String>[];
 
-    if (!isOpenAIConfigured) {
-      errors.add('OpenAI API key is not configured');
-    }
-
-    if (!isGoogleSearchConfigured) {
-      errors.add('Google Search API is not configured');
+    if (!isGroqConfigured) {
+      errors.add('Groq API key is not configured');
     }
 
     if (maxRequestsPerMinute <= 0) {
@@ -80,8 +61,7 @@ class AppEnvironmentConfig {
 
   static Map<String, dynamic> toMap() {
     return {
-      'openaiConfigured': isOpenAIConfigured,
-      'googleSearchConfigured': isGoogleSearchConfigured,
+      'groqConfigured': isGroqConfigured,
       'enableAnalytics': enableAnalytics,
       'enableCrashReporting': enableCrashReporting,
       'enablePerformanceMonitoring': enablePerformanceMonitoring,

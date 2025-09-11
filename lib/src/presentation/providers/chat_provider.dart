@@ -6,6 +6,8 @@ import '../../domain/repositories/chat_repository.dart';
 import '../../domain/repositories/ai_service_repository.dart';
 import '../providers/repository_providers.dart';
 
+import '../../core/error/failures.dart';
+
 final chatProvider =
     StateNotifierProvider.family<ChatNotifier, ChatState, String?>((
       ref,
@@ -134,14 +136,75 @@ class ChatNotifier extends StateNotifier<ChatState> {
     // Save user message
     await _chatRepository.saveMessage(userMessage);
 
-    // Set thinking state
-    state = ChatState.thinking(updatedMessages);
+    // Check connectivity for offline handling
+    try {
+      // Set thinking state
+      state = ChatState.thinking(updatedMessages);
 
-    // Generate AI response
-    final chatHistory = updatedMessages.where((msg) => msg.isUser).toList();
+      // Generate AI response
+      final chatHistory = updatedMessages.where((msg) => msg.isUser).toList();
+      final result = await _aiService.generateItinerary(
+        prompt: content,
+        chatHistory: chatHistory,
+      );
+
+      result.fold(
+        (failure) {
+          final errorMessage = ChatMessage(
+            content: _getOfflineErrorMessage(failure),
+            isUser: false,
+            timestamp: DateTime.now(),
+            messageType: MessageType.error,
+            itineraryId: _itineraryId,
+          );
+
+          final messagesWithError = [...updatedMessages, errorMessage];
+          state = ChatState.loaded(messagesWithError, null);
+          _chatRepository.saveMessage(errorMessage);
+        },
+        (itinerary) {
+          state = ChatState.loaded(updatedMessages, itinerary);
+        },
+      );
+    } catch (e) {
+      final errorMessage = ChatMessage(
+        content:
+            'Unable to generate itinerary. Please check your internet connection and try again.',
+        isUser: false,
+        timestamp: DateTime.now(),
+        messageType: MessageType.error,
+        itineraryId: _itineraryId,
+      );
+
+      final messagesWithError = [...updatedMessages, errorMessage];
+      state = ChatState.loaded(messagesWithError, null);
+      _chatRepository.saveMessage(errorMessage);
+    }
+  }
+
+  String _getOfflineErrorMessage(Failure failure) {
+    if (failure is NetworkFailure) {
+      return 'You\'re currently offline. Please check your internet connection and try again.';
+    } else if (failure is ConfigurationFailure) {
+      return 'Service configuration error. Please try again later.';
+    } else {
+      return 'Unable to generate itinerary. Please try again.';
+    }
+  }
+
+  Future<void> _regenerateItineraryWithRefinement(
+    Itinerary currentItinerary,
+    String refinementPrompt,
+  ) async {
+    // Create a new prompt that includes the original itinerary and refinement
+    final originalPrompt = 'Create a ${currentItinerary.days.length}-day itinerary for ${currentItinerary.title}';
+    final refinedPrompt = '$originalPrompt. Refinement: $refinementPrompt';
+    
+    // Generate updated itinerary
     final result = await _aiService.generateItinerary(
-      prompt: content,
-      chatHistory: chatHistory,
+      prompt: refinedPrompt,
+      chatHistory: [],
+      existingItinerary: currentItinerary,
     );
 
     result.fold(
@@ -154,12 +217,22 @@ class ChatNotifier extends StateNotifier<ChatState> {
           itineraryId: _itineraryId,
         );
 
-        final messagesWithError = [...updatedMessages, errorMessage];
-        state = ChatState.loaded(messagesWithError, null);
+        final currentMessages = state.maybeWhen(
+          loaded: (messages, itinerary) => messages,
+          orElse: () => <ChatMessage>[],
+        );
+
+        final messagesWithError = [...currentMessages, errorMessage];
+        state = ChatState.loaded(messagesWithError, currentItinerary);
         _chatRepository.saveMessage(errorMessage);
       },
-      (itinerary) {
-        state = ChatState.loaded(updatedMessages, itinerary);
+      (updatedItinerary) {
+        final currentMessages = state.maybeWhen(
+          loaded: (messages, itinerary) => messages,
+          orElse: () => <ChatMessage>[],
+        );
+
+        state = ChatState.loaded(currentMessages, updatedItinerary);
       },
     );
   }
@@ -216,7 +289,16 @@ class ChatNotifier extends StateNotifier<ChatState> {
         );
 
         final messagesWithResponse = [...updatedMessages, aiMessage];
-        state = ChatState.loaded(messagesWithResponse, currentItinerary);
+
+        // If response contains updated plan, regenerate the itinerary
+        Itinerary? updatedItinerary = currentItinerary;
+        if (response.contains('updated plan') || response.contains('added')) {
+          // Trigger a regeneration to get the updated itinerary
+          _regenerateItineraryWithRefinement(currentItinerary, refinementPrompt);
+          return;
+        }
+
+        state = ChatState.loaded(messagesWithResponse, updatedItinerary);
         _chatRepository.saveMessage(aiMessage);
       },
     );

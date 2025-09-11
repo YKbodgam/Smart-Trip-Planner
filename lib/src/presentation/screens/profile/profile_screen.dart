@@ -2,39 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
-import '../../../data/services/token_usage_provider.dart';
 import '../../providers/auth_provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
 import '../../widgets/profile/profile_header.dart';
-import '../../widgets/profile/token_usage_card.dart';
 import '../../widgets/common/custom_button.dart';
-
-final metricsHudProvider = StateProvider<bool>((ref) => false);
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
-
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inHours < 1) {
-      final minutes = difference.inMinutes;
-      return '$minutes minute${minutes == 1 ? '' : 's'} ago';
-    } else if (difference.inDays < 1) {
-      final hours = difference.inHours;
-      return '$hours hour${hours == 1 ? '' : 's'} ago';
-    } else {
-      final formatter = DateFormat('MMM d, h:mm a');
-      return formatter.format(dateTime);
-    }
-  }
 
   Future<void> _handleLogout(BuildContext context, WidgetRef ref) async {
     final shouldLogout = await showDialog<bool>(
@@ -64,7 +41,6 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final showMetricsHud = ref.watch(metricsHudProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -75,19 +51,6 @@ class ProfileScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => context.pop(),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.bug_report,
-              color: showMetricsHud
-                  ? AppColors.primary
-                  : AppColors.onSurfaceVariant,
-            ),
-            onPressed: () =>
-                ref.read(metricsHudProvider.notifier).state = !showMetricsHud,
-            tooltip: 'Toggle Metrics HUD',
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(horizontal: ScreenUtilHelper.spacing24),
@@ -97,14 +60,12 @@ class ProfileScreen extends ConsumerWidget {
             SizedBox(height: ScreenUtilHelper.spacing24),
             Consumer(
               builder: (context, ref, _) {
-                final user =
-                    ref
-                        .watch(authProvider)
-                        .maybeWhen(
-                          authenticated: (user) => user,
-                          orElse: () => null,
-                        ) ??
-                    null;
+                final user = ref
+                    .watch(authProvider)
+                    .maybeWhen(
+                      authenticated: (user) => user,
+                      orElse: () => null,
+                    );
                 final name =
                     user?.displayName ??
                     (user?.email.split('@').first ?? 'Traveler');
@@ -120,58 +81,6 @@ class ProfileScreen extends ConsumerWidget {
               },
             ),
             SizedBox(height: ScreenUtilHelper.spacing32),
-            Consumer(
-              builder: (context, ref, _) {
-                final stats = ref.watch(tokenUsageStatsProvider);
-                return TokenUsageCard(
-                  title: 'Request Tokens',
-                  used: stats.requestTokensUsed,
-                  total: stats.requestTokensLimit,
-                  color: AppColors.primary,
-                );
-              },
-            ),
-            SizedBox(height: ScreenUtilHelper.spacing16),
-            Consumer(
-              builder: (context, ref, _) {
-                final stats = ref.watch(tokenUsageStatsProvider);
-                return TokenUsageCard(
-                  title: 'Response Tokens',
-                  used: stats.responseTokensUsed,
-                  total: stats.responseTokensLimit,
-                  color: AppColors.error,
-                );
-              },
-            ),
-            SizedBox(height: ScreenUtilHelper.spacing16),
-            Container(
-              padding: EdgeInsets.all(ScreenUtilHelper.spacing20),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(ScreenUtilHelper.radius16),
-                border: Border.all(color: AppColors.outline.withOpacity(0.2)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total Cost',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.onSurface,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    '\$0.07 USD',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.success,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: ScreenUtilHelper.spacing40),
             _buildSettingsSection(context),
             SizedBox(height: ScreenUtilHelper.spacing40),
             CustomButton(
@@ -181,69 +90,6 @@ class ProfileScreen extends ConsumerWidget {
               icon: Icons.logout,
             ),
             SizedBox(height: ScreenUtilHelper.spacing24),
-            if (showMetricsHud)
-              Container(
-                margin: EdgeInsets.symmetric(
-                  vertical: ScreenUtilHelper.spacing16,
-                ),
-                padding: EdgeInsets.all(ScreenUtilHelper.spacing16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(
-                    ScreenUtilHelper.radius16,
-                  ),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Metrics HUD',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    SizedBox(height: ScreenUtilHelper.spacing8),
-                    Consumer(
-                      builder: (context, ref, _) {
-                        final user = ref
-                            .watch(authProvider)
-                            .maybeWhen(
-                              authenticated: (user) => user,
-                              orElse: () => null,
-                            );
-
-                        if (user == null) {
-                          return const SizedBox();
-                        }
-
-                        final tokenStats = ref.watch(tokenUsageStatsProvider);
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Model: gpt-3.5-turbo'),
-                            Text(
-                              'Request Tokens: ${tokenStats.requestTokensUsed}/${tokenStats.requestTokensLimit}',
-                            ),
-                            Text(
-                              'Response Tokens: ${tokenStats.responseTokensUsed}/${tokenStats.responseTokensLimit}',
-                            ),
-                            Text('Total Tokens: ${tokenStats.totalTokensUsed}'),
-                            Text(
-                              'Cost (USD): \$${tokenStats.totalCost.toStringAsFixed(3)}',
-                            ),
-                            Text(
-                              'Last Updated: ${_formatDateTime(DateTime.now())}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),

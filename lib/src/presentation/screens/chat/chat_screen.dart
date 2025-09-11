@@ -2,20 +2,20 @@ import '../../../core/utils/connectivity_helper.dart';
 import '../../../core/error/failures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/chat_provider.dart';
-import '../../providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
 import '../../../domain/entities/chat_message.dart';
+import '../../providers/repository_providers.dart';
 import '../../widgets/chat/chat_message_bubble.dart';
 import '../../widgets/chat/chat_input_field.dart';
 import '../../widgets/chat/itinerary_message_bubble.dart';
 import '../../widgets/chat/loading_message_bubble.dart';
 import '../../widgets/chat/error_message_bubble.dart';
 import '../../widgets/chat/typing_indicator_bubble.dart';
+import '../../widgets/common/user_avatar.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String? itineraryId;
@@ -43,21 +43,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             .read(chatProvider(widget.itineraryId).notifier)
             .sendMessage(prompt);
         _messageController.clear();
-        _scrollToBottom(    );
-  }
-
-  Widget _buildAvatarText(BuildContext context, String text) {
-    return Center(
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: AppColors.onPrimary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-});
+        _scrollToBottom();
+      }
+    });
   }
 
   @override
@@ -132,6 +120,59 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  Future<void> _saveItineraryOffline() async {
+    final state = ref.read(chatProvider(widget.itineraryId));
+    final itinerary = state.maybeWhen(
+      loaded: (messages, itinerary) => itinerary,
+      orElse: () => null,
+    );
+
+    if (itinerary == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No itinerary to save'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Save itinerary to local storage
+      final itineraryRepo = ref.read(itineraryRepositoryProvider);
+      final result = await itineraryRepo.saveItinerary(itinerary);
+
+      result.fold(
+        (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save: ${failure.message}'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        },
+        (savedItinerary) async {
+          // Mark as available offline
+          await itineraryRepo.markItineraryOffline(savedItinerary.id ?? '');
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Itinerary saved for offline access'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving itinerary: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Listen for state changes and scroll to bottom
@@ -197,39 +238,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onPressed: () => context.pop(),
         ),
         actions: [
-          Consumer(
-            builder: (context, ref, _) {
-              final user = ref.watch(authProvider).maybeWhen(
-                    authenticated: (user) => user,
-                    orElse: () => null,
-                  );
-              
-              final name = user?.displayName ?? (user?.email.split('@').first ?? 'T');
-              final avatarText = (name.isNotEmpty ? name[0] : 'T').toUpperCase();
-              final avatarUrl = user?.photoUrl;
-
-              return Container(
-                width: 40.w,
-                height: 40.w,
-                margin: EdgeInsets.only(right: ScreenUtilHelper.spacing16),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20.r),
-                ),
-                child: avatarUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(20.r),
-                        child: Image.network(
-                          avatarUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _buildAvatarText(context, avatarText);
-                          },
-                        ),
-                      )
-                    : _buildAvatarText(context, avatarText),
-              );
-            },
+          Padding(
+            padding: EdgeInsets.only(right: ScreenUtilHelper.spacing16),
+            child: const UserAvatar(size: 40),
           ),
         ],
       ),
@@ -253,23 +264,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   else
                     ChatMessageBubble(message: message),
 
+                // Remove GoogleSearchResultsBubble and List<SearchResult> logic
                 if (itinerary != null)
                   ItineraryMessageBubble(
                     itinerary: itinerary,
-                    onSaveOffline: () {
-                      // Optional UX hook (repos already handle persistence as needed)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Itinerary ready — saved entry available in Trips.',
-                          ),
-                          backgroundColor: AppColors.success,
-                        ),
-                      );
-                    },
+                    onSaveOffline: _saveItineraryOffline,
                     onFollowUp: () {
-                      // focus management for follow-up prompt (kept minimal)
-                      FocusScope.of(context).unfocus();
+                      FocusScope.of(context).requestFocus(FocusNode());
+                      _messageController.text =
+                          "Can you refine this itinerary by ";
+                      _messageController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _messageController.text.length),
+                      );
                     },
                   ),
 
@@ -330,8 +336,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
-                // place caret in input (keep behavior simple)
-                FocusScope.of(context).unfocus();
+                // Focus on input field for refinement
+                FocusScope.of(context).requestFocus(FocusNode());
+                _messageController.clear();
               },
               icon: const Icon(Icons.chat_bubble_outline),
               label: const Text('Follow up to refine'),
@@ -354,14 +361,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Saved for offline'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              },
+              onPressed: () => _saveItineraryOffline(),
               icon: const Icon(Icons.download_outlined),
               label: const Text('Save Offline'),
               style: OutlinedButton.styleFrom(
@@ -379,18 +379,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAvatarText(BuildContext context, String text) {
-    return Center(
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: AppColors.onPrimary,
-          fontWeight: FontWeight.w600,
-        ),
       ),
     );
   }

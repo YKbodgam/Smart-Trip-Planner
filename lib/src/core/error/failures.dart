@@ -160,6 +160,15 @@ class JsonParsingFailure extends Failure {
   });
 }
 
+class ParsingFailure extends Failure {
+  ParsingFailure({
+    required super.message,
+    super.code,
+    super.details,
+    super.timestamp,
+  });
+}
+
 class DatabaseFailure extends Failure {
   DatabaseFailure({
     required super.message,

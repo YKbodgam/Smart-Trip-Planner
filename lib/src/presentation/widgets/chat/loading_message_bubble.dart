@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
+import '../common/user_avatar.dart';
 
 class LoadingMessageBubble extends StatefulWidget {
   final String message;
@@ -45,18 +46,7 @@ class _LoadingMessageBubbleState extends State<LoadingMessageBubble>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // AI Avatar
-          Container(
-            width: 32.w,
-            height: 32.w,
-            decoration: BoxDecoration(
-              color: AppColors.warning,
-              borderRadius: BorderRadius.circular(16.r),
-            ),
-            child: Center(
-              child: Icon(Icons.smart_toy, color: AppColors.white, size: 16.w),
-            ),
-          ),
-
+          const AIAvatar(size: 32),
           SizedBox(width: ScreenUtilHelper.spacing8),
 
           Expanded(
@@ -89,17 +79,18 @@ class _LoadingMessageBubbleState extends State<LoadingMessageBubble>
                   ),
                   child: Row(
                     children: [
-                      // Loading Indicator
-                      Container(
-                        width: 8.w,
-                        height: 8.w,
-                        decoration: BoxDecoration(
-                          color: AppColors.info,
-                          borderRadius: BorderRadius.circular(4.r),
+                      SizedBox(
+                        width: 16.w,
+                        height: 16.w,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.w,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primary,
+                          ),
                         ),
                       ),
 
-                      SizedBox(width: ScreenUtilHelper.spacing8),
+                      SizedBox(width: ScreenUtilHelper.spacing12),
 
                       // Loading Text
                       AnimatedBuilder(

@@ -1,18 +1,10 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/database/hive_service.dart';
-import 'environment_config.dart';
+import 'app_environment.dart';
 
 class AppConfig {
   static late HiveService _hiveService; // Changed from Isar to Hive
-
-  // API Configuration
-  static String get openaiBaseUrl => AppEnvironmentConfig.openaiBaseUrl;
-  static String get openaiApiKey => AppEnvironmentConfig.openaiApiKey;
-  static String get googleSearchApiKey =>
-      AppEnvironmentConfig.googleSearchApiKey;
-  static String get googleSearchEngineId =>
-      AppEnvironmentConfig.googleSearchEngineId;
 
   // Feature flags
   static bool get enableAnalytics => AppEnvironmentConfig.enableAnalytics;
@@ -72,11 +64,6 @@ class AppConfig {
       }
     }
   }
-
-  // Configuration status methods
-  static bool get isOpenAIConfigured => AppEnvironmentConfig.isOpenAIConfigured;
-  static bool get isGoogleSearchConfigured =>
-      AppEnvironmentConfig.isGoogleSearchConfigured;
 
   // Get configuration summary
   static Map<String, dynamic> getConfigurationSummary() {

@@ -4,7 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 class ScreenUtilHelper {
   // Design size based on iPhone 14 Pro (393x852)
   static const Size designSize = Size(393, 852);
-  
+
   // Common spacing values
   static double get spacing4 => 4.w;
   static double get spacing8 => 8.w;
@@ -15,14 +15,14 @@ class ScreenUtilHelper {
   static double get spacing32 => 32.w;
   static double get spacing40 => 40.w;
   static double get spacing48 => 48.w;
-  
+
   // Common radius values
   static double get radius8 => 8.r;
   static double get radius12 => 12.r;
   static double get radius16 => 16.r;
   static double get radius20 => 20.r;
   static double get radius24 => 24.r;
-  
+
   // Common font sizes
   static double get fontSize12 => 12.sp;
   static double get fontSize14 => 14.sp;
@@ -32,7 +32,7 @@ class ScreenUtilHelper {
   static double get fontSize24 => 24.sp;
   static double get fontSize28 => 28.sp;
   static double get fontSize32 => 32.sp;
-  
+
   // Screen dimensions
   static double get screenWidth => 1.sw;
   static double get screenHeight => 1.sh;

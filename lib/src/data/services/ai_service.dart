@@ -1,110 +1,308 @@
 import 'dart:async';
-import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:dartz/dartz.dart';
 
 import '../../core/error/failures.dart';
 import '../../domain/entities/itinerary.dart';
 import '../../domain/entities/chat_message.dart';
-import '../../core/config/environment_config.dart';
 import '../../domain/repositories/ai_service_repository.dart';
 
-import 'token_tracking_service.dart'; // Added token tracking service import
+import 'web_search_service.dart';
+import 'groq_service.dart';
+
+class _ParsedPrompt {
+  final String title;
+  final String? location;
+  final int days;
+  final DateTime startDate;
+
+  _ParsedPrompt({
+    required this.title,
+    required this.location,
+    required this.days,
+    required this.startDate,
+  });
+}
+
+_ParsedPrompt _parsePrompt(String prompt) {
+  // Very lightweight heuristic parser to extract location and days
+  final lower = prompt.toLowerCase();
+  final daysMatch = RegExp(r'(\d+)\s*(day|days)').firstMatch(lower);
+  final int days = int.tryParse(daysMatch?.group(1) ?? '') ?? 3;
+
+  String? location;
+  // naive: pick last word group after 'in'
+  final inMatch = RegExp(r'in\s+([a-zA-Z\s,]+)').firstMatch(prompt);
+  if (inMatch != null) {
+    location = inMatch.group(1)?.trim();
+    if (location != null) {
+      // trim trailing punctuation
+      location = location.replaceAll(RegExp(r'[\.!]$'), '').trim();
+    }
+  }
+
+  final startDate = DateTime.now();
+  final title = prompt.trim().isEmpty
+      ? 'Trip Plan'
+      : '$days-Day Trip${location != null ? ' in $location' : ''}';
+
+  return _ParsedPrompt(
+    title: title,
+    location: location,
+    days: days.clamp(1, 30),
+    startDate: startDate,
+  );
+}
+
+String? _getLocationCoordinates(
+  String? location,
+  String timeOfDay,
+  int dayIndex,
+) {
+  // For now we'll return null instead of hardcoded coordinates
+  // In a real implementation, this would use a geocoding service API
+  if (location == null) return null;
+
+  // Return null as placeholder - would be replaced with actual API call
+  return null;
+}
 
 class AIService implements AIServiceRepository {
-  final Dio _dio;
-  final TokenTrackingService
-  _tokenTrackingService; // Added token tracking service
-  static const String _model = 'gpt-4o-mini'; // Low-cost, current model
+  // Performance optimization: simple caching system
 
-  AIService({
-    Dio? dio,
-    TokenTrackingService?
-    tokenTrackingService, // Added token tracking service parameter
-  }) : _dio = dio ?? _createDioInstance(),
-       _tokenTrackingService = tokenTrackingService ?? TokenTrackingService();
+  final WebSearchService _webSearchService;
+  final GroqService _groqService;
 
-  static Dio _createDioInstance() {
-    final dio = Dio();
-    dio.options.baseUrl = EnvironmentConfig.openaiBaseUrl;
-    dio.options.headers = {
-      'Authorization': 'Bearer ${EnvironmentConfig.openaiApiKey}',
-      'OpenAI-Organization': EnvironmentConfig.openaiOrganizationId,
-      'Content-Type': 'application/json',
-    };
-    dio.options.connectTimeout = const Duration(seconds: 30);
-    dio.options.receiveTimeout = const Duration(seconds: 60);
-    return dio;
-  }
+  AIService({WebSearchService? webSearchService, GroqService? groqService})
+    : _webSearchService = webSearchService ?? WebSearchService(),
+      _groqService = groqService ?? GroqService();
 
   @override
   Future<Either<Failure, Itinerary>> generateItinerary({
     required String prompt,
     List<ChatMessage>? chatHistory,
     Itinerary? existingItinerary,
-    String? userId, // Added userId parameter for token tracking
   }) async {
     try {
-      if (!EnvironmentConfig.isOpenAIConfigured) {
-        return Left(
-          ConfigurationFailure(message: 'OpenAI API key not configured'),
-        );
-      }
+      final _ParsedPrompt parsed = _parsePrompt(prompt);
 
-      final response = await _dio.post(
-        '/chat/completions',
-        data: {
-          'model': _model,
-          'messages': _buildMessages(prompt, chatHistory, existingItinerary),
-          'tools': [
-            _getItineraryTool(),
-          ], // Updated to use tools instead of functions
-          'tool_choice': {
-            'type': 'function',
-            'function': {'name': 'generate_itinerary'},
-          },
-          'temperature': 0.7,
-          'max_tokens': 1200,
-        },
+      // Convert chat history to Groq format
+      final groqChatHistory = chatHistory
+          ?.map((msg) => {'isUser': msg.isUser, 'content': msg.content})
+          .toList();
+
+      // First try to generate a structured itinerary using the new method
+      final structuredResult = await _groqService.generateStructuredItinerary(
+        prompt: prompt,
+        chatHistory: chatHistory,
+        existingItinerary: existingItinerary,
+        useCache: true,
       );
 
-      final usage = response.data['usage'];
-      if (usage != null && userId != null) {
-        await _tokenTrackingService.trackTokenUsage(
-          userId: userId,
-          promptTokens: usage['prompt_tokens'] ?? 0,
-          completionTokens: usage['completion_tokens'] ?? 0,
-          model: _model,
-          requestId: response.data['id'],
-        );
-      }
+      return structuredResult.fold(
+        (failure) async {
+          // Fall back to the older text-based approach if structured fails
+          final groqResult = await _groqService.generateItinerary(
+            prompt: prompt,
+            chatHistory: groqChatHistory,
+            existingItinerary: existingItinerary?.toJson(),
+          );
 
-      final choice = response.data['choices'][0];
-      final toolCalls = choice['message']['tool_calls'];
+          return groqResult.fold((failure) => Left(failure), (response) async {
+            // Parse the Groq response into structured itinerary
+            final itinerary = _parseGroqResponse(response, parsed);
 
-      if (toolCalls != null && toolCalls.isNotEmpty) {
-        final toolCall = toolCalls[0];
-        if (toolCall['function']['name'] == 'generate_itinerary') {
-          final argumentsJson = toolCall['function']['arguments'];
-          final itineraryData = json.decode(argumentsJson);
-          try {
-            final itinerary = _parseItineraryFromJson(itineraryData);
+            // Optionally enrich with Google Search results
+            if (parsed.location != null && parsed.location!.isNotEmpty) {
+              final enrichedItinerary = await _enrichWithSearchResults(
+                itinerary,
+                parsed.location!,
+              );
+              return Right(enrichedItinerary);
+            }
             return Right(itinerary);
-          } on FormatException catch (e) {
-            return Left(
-              AIServiceFailure(
-                message: 'Itinerary schema validation failed: \\${e.message}',
-              ),
-            );
-          }
-        }
-      }
+          });
+        },
+        (structuredData) async {
+          // Use the structured data directly
+          // This would require a new method to convert the structured JSON to Itinerary
+          final itinerary = _createItineraryFromStructuredData(
+            structuredData,
+            parsed,
+          );
 
-      return Left(AIServiceFailure(message: 'Failed to generate itinerary'));
-    } on DioException catch (e) {
-      return _handleDioException(e);
+          // Optionally enrich with Google Search results
+          if (parsed.location != null && parsed.location!.isNotEmpty) {
+            final enrichedItinerary = await _enrichWithSearchResults(
+              itinerary,
+              parsed.location!,
+            );
+            return Right(enrichedItinerary);
+          }
+          return Right(itinerary);
+        },
+      );
     } catch (e) {
       return Left(UnknownFailure(message: e.toString()));
+    }
+  }
+
+  Itinerary _parseGroqResponse(String response, _ParsedPrompt parsed) {
+    // Parse the Groq response and extract structured data
+    final lines = response.split('\n');
+    final List<ItineraryDay> days = [];
+
+    String currentDaySummary = '';
+    final List<ItineraryItem> currentItems = [];
+    int dayIndex = 0;
+
+    for (final line in lines) {
+      final trimmedLine = line.trim();
+
+      // Check for day headers
+      if (trimmedLine.startsWith('**Day') && trimmedLine.contains(':**')) {
+        // Save previous day if exists
+        if (currentDaySummary.isNotEmpty && currentItems.isNotEmpty) {
+          days.add(
+            ItineraryDay(
+              date: parsed.startDate
+                  .add(Duration(days: dayIndex))
+                  .toIso8601String()
+                  .split('T')
+                  .first,
+              summary: currentDaySummary,
+              items: List.from(currentItems),
+            ),
+          );
+          currentItems.clear();
+          dayIndex++;
+        }
+
+        // Extract day summary
+        currentDaySummary = trimmedLine
+            .replaceAll('**', '')
+            .replaceAll('Day ${dayIndex + 1}:', '')
+            .trim();
+      }
+      // Check for activity sections
+      else if (trimmedLine.startsWith('**Morning:**') ||
+          trimmedLine.startsWith('**Transfer:**') ||
+          trimmedLine.startsWith('**Accommodation:**') ||
+          trimmedLine.startsWith('**Afternoon:**') ||
+          trimmedLine.startsWith('**Evening:**')) {
+        final section = trimmedLine.split(':**')[0].replaceAll('**', '');
+        final content = trimmedLine.split(':**')[1].trim();
+
+        currentItems.add(
+          ItineraryItem(
+            time: _getTimeForSection(section),
+            activity: content,
+            location: _getLocationCoordinates(
+              parsed.location,
+              section.toLowerCase(),
+              dayIndex,
+            ),
+            description: _getDescriptionForSection(section),
+          ),
+        );
+      }
+    }
+
+    // Add the last day
+    if (currentDaySummary.isNotEmpty && currentItems.isNotEmpty) {
+      days.add(
+        ItineraryDay(
+          date: parsed.startDate
+              .add(Duration(days: dayIndex))
+              .toIso8601String()
+              .split('T')
+              .first,
+          summary: currentDaySummary,
+          items: List.from(currentItems),
+        ),
+      );
+    }
+
+    // If no days were parsed, create a fallback
+    if (days.isEmpty) {
+      final date = parsed.startDate.toIso8601String().split('T').first;
+      final daySummary = 'Day 1: ${parsed.title}';
+
+      days.add(
+        ItineraryDay(
+          date: date,
+          summary: daySummary,
+          items: [
+            ItineraryItem(
+              time: _getTimeForSection('morning'),
+              activity: 'Start your journey',
+              location: _getLocationCoordinates(parsed.location, 'morning', 0),
+              description: _getDescriptionForSection('morning'),
+            ),
+          ],
+        ),
+      );
+    }
+    return Itinerary(
+      title: parsed.title,
+      startDate: days.first.date,
+      endDate: days.last.date,
+      totalCost: null,
+      currency: null,
+      days: days,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  String _getTimeForSection(String section) {
+    // We could replace this with a configuration from a settings file
+    // or a database lookup in a real app
+    // For now we'll return sensible defaults based on the section
+    final defaultTimes = {
+      'morning': '09:00',
+      'transfer': '11:00',
+      'accommodation': '12:00',
+      'afternoon': '14:00',
+      'evening': '19:00',
+    };
+
+    return defaultTimes[section.toLowerCase()] ?? '10:00';
+  }
+
+  String? _getDescriptionForSection(String section) {
+    // These descriptions could come from a translation file or database
+    // to support internationalization
+    final defaultDescriptions = {
+      'morning': 'Start your day with this activity',
+      'transfer': 'Travel to your next destination',
+      'accommodation': 'Check into your accommodation',
+      'afternoon': 'Continue exploring in the afternoon',
+      'evening': 'End your day with this experience',
+    };
+
+    return defaultDescriptions[section.toLowerCase()];
+  }
+
+  Future<Itinerary> _enrichWithSearchResults(
+    Itinerary itinerary,
+    String location,
+  ) async {
+    try {
+      // Use the search method available in WebSearchService
+      final searchQuery =
+          '$location travel guide ${itinerary.startDate} to ${itinerary.endDate}';
+      final searchResult = await _webSearchService.search(searchQuery);
+
+      return searchResult.fold(
+        (failure) => itinerary, // Return original if search fails
+        (results) {
+          // For now, just return the original itinerary
+          // In the future, we could use search results to enhance descriptions
+          return itinerary;
+        },
+      );
+    } catch (e) {
+      return itinerary; // Return original if enrichment fails
     }
   }
 
@@ -113,46 +311,197 @@ class AIService implements AIServiceRepository {
     required String prompt,
     required Itinerary currentItinerary,
     required List<ChatMessage> chatHistory,
-    String? userId, // Added userId parameter for token tracking
   }) async {
     try {
-      if (!EnvironmentConfig.isOpenAIConfigured) {
-        return Left(
-          ConfigurationFailure(message: 'OpenAI API key not configured'),
+      // Convert chat history to Groq format
+      final groqChatHistory = chatHistory
+          .map((msg) => {'isUser': msg.isUser, 'content': msg.content})
+          .toList();
+
+      // Create a refinement prompt that includes the current itinerary
+      final refinementPrompt =
+          '''
+Current itinerary: ${_formatItineraryForResponse(currentItinerary)}
+
+User request: $prompt
+
+Please refine the itinerary based on the user's request. If they want to add something, include it in the appropriate day. If they want to remove something, exclude it. If they want to change something, modify it accordingly.
+
+Respond with the updated itinerary in the same format:
+**Day X: [Day Summary]**
+**Morning:** [Morning activity]
+**Transfer:** [Travel details if applicable]
+**Accommodation:** [Hotel details if applicable]
+**Afternoon:** [Afternoon activity]
+**Evening:** [Evening activity]
+''';
+
+      // Try using the new human-readable approach first
+      final humanReadableResult = await _groqService
+          .generateHumanReadableItinerary(
+            prompt: refinementPrompt,
+            chatHistory: chatHistory,
+            existingItinerary: currentItinerary,
+          );
+
+      return humanReadableResult.fold((failure) async {
+        // Fall back to older method if new one fails
+        final groqResult = await _groqService.generateItinerary(
+          prompt: refinementPrompt,
+          chatHistory: groqChatHistory,
+          existingItinerary: currentItinerary.toJson(),
         );
-      }
 
-      final response = await _dio.post(
-        '/chat/completions',
-        data: {
-          'model': _model,
-          'messages': _buildRefinementMessages(
-            prompt,
-            currentItinerary,
-            chatHistory,
-          ),
-          'temperature': 0.7,
-          'max_tokens': 800,
-        },
-      );
-
-      final usage = response.data['usage'];
-      if (usage != null && userId != null) {
-        await _tokenTrackingService.trackTokenUsage(
-          userId: userId,
-          promptTokens: usage['prompt_tokens'] ?? 0,
-          completionTokens: usage['completion_tokens'] ?? 0,
-          model: _model,
-          requestId: response.data['id'],
+        return groqResult.fold(
+          (failure) => Left(failure),
+          (response) => Right(response),
         );
-      }
-
-      final content = response.data['choices'][0]['message']['content'];
-      return Right(content ?? 'I\'ll help you refine your itinerary.');
-    } on DioException catch (e) {
-      return _handleDioException(e);
+      }, (response) => Right(response));
     } catch (e) {
       return Left(UnknownFailure(message: e.toString()));
+    }
+  }
+
+  String _formatItineraryForResponse(Itinerary itinerary) {
+    final buffer = StringBuffer();
+    buffer.writeln('**${itinerary.title}**\n');
+
+    for (final day in itinerary.days) {
+      buffer.writeln('**${day.summary}**');
+      for (final item in day.items) {
+        buffer.writeln('• ${item.time}: ${item.activity}');
+        if (item.description != null) {
+          buffer.writeln('  ${item.description}');
+        }
+      }
+      buffer.writeln();
+    }
+
+    return buffer.toString();
+  }
+
+  // Create an itinerary from structured JSON data returned by the groq service
+  Itinerary _createItineraryFromStructuredData(
+    Map<String, dynamic> data,
+    _ParsedPrompt parsed,
+  ) {
+    try {
+      // Extract basic itinerary info
+      final String title = data['title'] ?? parsed.title;
+      final dynamic totalCost = data['totalCost'];
+      final String? currency = data['currency'];
+
+      // Extract days data
+      final List<dynamic> daysData = data['days'] ?? [];
+      final List<ItineraryDay> days = [];
+
+      if (daysData.isNotEmpty) {
+        for (int i = 0; i < daysData.length; i++) {
+          final dayData = daysData[i];
+          final String summary =
+              dayData['summary'] ?? 'Day ${i + 1}: Exploration';
+          final String date =
+              dayData['date'] ??
+              parsed.startDate
+                  .add(Duration(days: i))
+                  .toIso8601String()
+                  .split('T')
+                  .first;
+
+          // Extract items for this day
+          final List<dynamic> itemsData = dayData['items'] ?? [];
+          final List<ItineraryItem> items = [];
+
+          for (final itemData in itemsData) {
+            final String time = itemData['time'] ?? '';
+            final String activity = itemData['activity'] ?? '';
+            final String? location = itemData['location'];
+            final String? description = itemData['description'];
+
+            items.add(
+              ItineraryItem(
+                time: time,
+                activity: activity,
+                location: location,
+                description: description,
+              ),
+            );
+          }
+
+          days.add(ItineraryDay(date: date, summary: summary, items: items));
+        }
+      }
+
+      // If no days were parsed, create a fallback day
+      if (days.isEmpty) {
+        final date = parsed.startDate.toIso8601String().split('T').first;
+        final daySummary = 'Day 1: ${parsed.title}';
+
+        days.add(
+          ItineraryDay(
+            date: date,
+            summary: daySummary,
+            items: [
+              ItineraryItem(
+                time: _getTimeForSection('morning'),
+                activity: 'Start your journey',
+                location: _getLocationCoordinates(
+                  parsed.location,
+                  'morning',
+                  0,
+                ),
+                description: _getDescriptionForSection('morning'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return Itinerary(
+        title: title,
+        startDate: days.first.date,
+        endDate: days.last.date,
+        totalCost: totalCost,
+        currency: currency,
+        days: days,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    } catch (e) {
+      // Fallback if parsing fails
+      final startDate = parsed.startDate.toIso8601String().split('T').first;
+      final endDate = parsed.startDate
+          .add(Duration(days: parsed.days - 1))
+          .toIso8601String()
+          .split('T')
+          .first;
+      final daySummary = 'Day 1: ${parsed.title}';
+
+      return Itinerary(
+        title: parsed.title,
+        startDate: startDate,
+        endDate: endDate,
+        days: [
+          ItineraryDay(
+            date: startDate,
+            summary: daySummary,
+            items: [
+              ItineraryItem(
+                time: _getTimeForSection('morning'),
+                activity: 'Start your journey',
+                location: _getLocationCoordinates(
+                  parsed.location,
+                  'morning',
+                  0,
+                ),
+                description: _getDescriptionForSection('morning'),
+              ),
+            ],
+          ),
+        ],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
     }
   }
 
@@ -163,359 +512,59 @@ class AIService implements AIServiceRepository {
     Itinerary? existingItinerary,
   }) async* {
     try {
-      if (!EnvironmentConfig.isOpenAIConfigured) {
-        yield Left(
-          ConfigurationFailure(message: 'OpenAI API key not configured'),
+      // Convert chat history to Groq format
+      final groqChatHistory = chatHistory
+          ?.map((msg) => {'isUser': msg.isUser, 'content': msg.content})
+          .toList();
+
+      // First try to use the human-readable streaming approach
+      try {
+        yield* _groqService.streamHumanReadableItinerary(
+          prompt: prompt,
+          chatHistory: chatHistory,
+          existingItinerary: existingItinerary,
         );
         return;
+      } catch (e) {
+        // Fall back to the older streaming method if the new one fails
+        yield* _groqService.streamItinerary(
+          prompt: prompt,
+          chatHistory: groqChatHistory,
+          existingItinerary: existingItinerary?.toJson(),
+        );
       }
-
-      final response = await _dio.post(
-        '/chat/completions',
-        options: Options(responseType: ResponseType.stream),
-        data: {
-          'model': _model,
-          'messages': _buildMessages(prompt, chatHistory, existingItinerary),
-          'stream': true,
-          'temperature': 0.7,
-          'max_tokens': 1200,
-        },
-      );
-
-      final stream = response.data.stream as Stream<List<int>>;
-      String buffer = '';
-
-      await for (final chunk in stream) {
-        buffer += utf8.decode(chunk);
-        final lines = buffer.split('\n');
-        buffer = lines.removeLast(); // Keep incomplete line in buffer
-
-        for (final line in lines) {
-          if (line.trim().isEmpty) continue;
-          if (line.startsWith('data: ')) {
-            final data = line.substring(6).trim();
-            if (data == '[DONE]') return;
-
-            try {
-              final jsonData = json.decode(data);
-              final delta = jsonData['choices']?[0]?['delta'];
-              if (delta != null && delta['content'] != null) {
-                yield Right(delta['content'] as String);
-              }
-            } catch (e) {
-              // Skip malformed JSON chunks
-              continue;
-            }
-          }
-        }
-      }
-    } on DioException catch (e) {
-      yield _handleDioException(
-        e,
-      ).fold((failure) => Left(failure), (success) => const Right(''));
     } catch (e) {
       yield Left(UnknownFailure(message: e.toString()));
     }
   }
 
-  @override
+  // Method to search web information
   Future<Either<Failure, Map<String, dynamic>>> searchWebInformation({
     required String query,
     String? location,
     String? dateRange,
   }) async {
-    try {
-      if (!EnvironmentConfig.isGoogleSearchConfigured) {
-        return Left(
-          ConfigurationFailure(message: 'Google Search API not configured'),
-        );
-      }
-
-      String searchQuery = query;
-      if (location != null) {
-        searchQuery += ' in $location';
-      }
-      if (dateRange != null) {
-        searchQuery += ' $dateRange';
-      }
-
-      final searchDio = Dio();
-      final response = await searchDio.get(
-        'https://www.googleapis.com/customsearch/v1',
-        queryParameters: {
-          'key': EnvironmentConfig.googleSearchApiKey,
-          'cx': EnvironmentConfig.googleSearchEngineId,
-          'q': searchQuery,
-          'num': 5,
-        },
-      );
-
-      final results = response.data['items'] as List<dynamic>? ?? [];
-      return Right({
-        'results': results
-            .map(
-              (item) => {
-                'title': item['title'] ?? '',
-                'url': item['link'] ?? '',
-                'snippet': item['snippet'] ?? '',
-              },
-            )
-            .toList(),
-        'query': searchQuery,
-      });
-    } on DioException catch (e) {
-      return Left(NetworkFailure(message: e.message ?? 'Search API error'));
-    } catch (e) {
-      return Left(UnknownFailure(message: e.toString()));
+    // Build a complete search query incorporating all parameters
+    String searchQuery = query;
+    if (location != null && location.isNotEmpty) {
+      searchQuery += ' $location';
     }
-  }
-
-  Future<Either<Failure, Map<String, int>>> getTokenUsage({
-    required String prompt,
-    List<ChatMessage>? chatHistory,
-  }) async {
-    try {
-      // Estimate tokens (rough calculation: ~4 characters per token)
-      final messages = _buildMessages(prompt, chatHistory, null);
-      final totalText = messages.map((m) => m['content']).join(' ');
-      final estimatedTokens = (totalText.length / 4).ceil();
-
-      return Right({
-        'prompt_tokens': estimatedTokens,
-        'completion_tokens': 0, // Will be updated after response
-        'total_tokens': estimatedTokens,
-      });
-    } catch (e) {
-      return Left(UnknownFailure(message: e.toString()));
-    }
-  }
-
-  List<Map<String, dynamic>> _buildMessages(
-    String prompt,
-    List<ChatMessage>? chatHistory,
-    Itinerary? existingItinerary,
-  ) {
-    final messages = <Map<String, dynamic>>[
-      {
-        'role': 'system',
-        'content':
-            '''You are a professional travel planner AI. Generate detailed, personalized travel itineraries based on user preferences. 
-        Always include specific times, activities, locations with coordinates when possible, and practical travel advice.
-        Format your response as a structured JSON itinerary.''',
-      },
-    ];
-
-    // Add chat history (limit to last 6 to control tokens)
-    if (chatHistory != null && chatHistory.isNotEmpty) {
-      final limited = chatHistory.length > 6
-          ? chatHistory.sublist(chatHistory.length - 6)
-          : chatHistory;
-      for (final message in limited) {
-        messages.add({
-          'role': message.isUser ? 'user' : 'assistant',
-          'content': message.content,
-        });
-      }
+    if (dateRange != null && dateRange.isNotEmpty) {
+      searchQuery += ' $dateRange';
     }
 
-    // Add current prompt
-    messages.add({'role': 'user', 'content': prompt});
-
-    return messages;
-  }
-
-  List<Map<String, dynamic>> _buildRefinementMessages(
-    String prompt,
-    Itinerary currentItinerary,
-    List<ChatMessage> chatHistory,
-  ) {
-    final messages = <Map<String, dynamic>>[
-      {
-        'role': 'system',
-        'content':
-            '''You are a professional travel planner AI. Help users refine and modify their existing travel itineraries.
-        Be helpful and provide specific suggestions based on their requests.''',
-      },
-    ];
-
-    // Add chat history
-    for (final message in chatHistory) {
-      messages.add({
-        'role': message.isUser ? 'user' : 'assistant',
-        'content': message.content,
-      });
-    }
-
-    // Add current refinement request
-    messages.add({'role': 'user', 'content': prompt});
-
-    return messages;
-  }
-
-  Map<String, dynamic> _getItineraryTool() {
-    return {
-      'type': 'function',
-      'function': {
-        'name': 'generate_itinerary',
-        'description':
-            'Generate a structured travel itinerary with detailed daily activities',
-        'parameters': {
-          'type': 'object',
-          'properties': {
-            'title': {
-              'type': 'string',
-              'description': 'A descriptive title for the itinerary',
-            },
-            'startDate': {
-              'type': 'string',
-              'description': 'Start date in YYYY-MM-DD format',
-            },
-            'endDate': {
-              'type': 'string',
-              'description': 'End date in YYYY-MM-DD format',
-            },
-            'totalCost': {
-              'type': 'number',
-              'description': 'Estimated total cost in USD',
-            },
-            'currency': {
-              'type': 'string',
-              'description': 'Currency code (e.g., USD, EUR)',
-            },
-            'days': {
-              'type': 'array',
-              'items': {
-                'type': 'object',
-                'properties': {
-                  'date': {'type': 'string'},
-                  'summary': {'type': 'string'},
-                  'items': {
-                    'type': 'array',
-                    'items': {
-                      'type': 'object',
-                      'properties': {
-                        'time': {'type': 'string'},
-                        'activity': {'type': 'string'},
-                        'location': {'type': 'string'},
-                        'description': {'type': 'string'},
-                        'estimatedCost': {'type': 'number'},
-                        'category': {'type': 'string'},
-                      },
-                      'required': ['time', 'activity'],
-                    },
-                  },
-                },
-                'required': ['date', 'summary', 'items'],
-              },
-            },
-          },
-          'required': ['title', 'startDate', 'endDate', 'days'],
-        },
-      },
-    };
-  }
-
-  Itinerary _parseItineraryFromJson(Map<String, dynamic> json) {
-    // Schema validation
-    if (json['title'] == null ||
-        json['startDate'] == null ||
-        json['endDate'] == null ||
-        json['days'] == null) {
-      throw FormatException(
-        'Itinerary JSON schema invalid: missing required fields',
-      );
-    }
-    if (json['days'] is! List || (json['days'] as List).isEmpty) {
-      throw FormatException(
-        'Itinerary JSON schema invalid: days must be a non-empty list',
-      );
-    }
-    final days = (json['days'] as List<dynamic>).map((dayJson) {
-      final items = (dayJson['items'] as List<dynamic>).map((itemJson) {
-        return ItineraryItem(
-          time: itemJson['time'] ?? '',
-          activity: itemJson['activity'] ?? '',
-          location: itemJson['location'],
-          description: itemJson['description'],
-          estimatedCost: itemJson['estimatedCost']?.toDouble(),
-          category: itemJson['category'],
-        );
-      }).toList();
-
-      return ItineraryDay(
-        date: dayJson['date'] ?? '',
-        summary: dayJson['summary'] ?? '',
-        items: items,
-      );
-    }).toList();
-
-    return Itinerary(
-      title: json['title'] ?? 'Untitled Itinerary',
-      startDate: json['startDate'] ?? '',
-      endDate: json['endDate'] ?? '',
-      totalCost: json['totalCost']?.toDouble(),
-      currency: json['currency'] ?? 'USD',
-      days: days,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+    // Use the search method from WebSearchService
+    final searchResult = await _webSearchService.searchWithFallback(
+      searchQuery,
     );
-  }
 
-  Either<Failure, T> _handleDioException<T>(DioException e) {
-    final status = e.response?.statusCode;
-    final data = e.response?.data;
-    if (status == 429) {
-      final errMsg = data is Map && data['error'] is Map
-          ? (data['error']['message'] as String? ??
-                'Rate limit or quota exceeded')
-          : 'Rate limit or quota exceeded';
-      final errCode = data is Map && data['error'] is Map
-          ? data['error']['code'] as String?
-          : null;
-      if (errCode == 'insufficient_quota') {
-        return Left(
-          RateLimitFailure(
-            message:
-                'You have exceeded your current quota. Please check plan and billing.',
-            code: status,
-            details: errMsg,
-          ),
-        );
-      }
-      return Left(
-        RateLimitFailure(
-          message: 'Too many requests. Please try again later.',
-          code: status,
-          details: errMsg,
-        ),
-      );
-    } else if (status == 401) {
-      return Left(
-        AuthenticationFailure(
-          message: 'Invalid API key',
-          code: status,
-          details: data?.toString(),
-        ),
-      );
-    } else if (status == 400) {
-      return Left(
-        ValidationFailure(
-          message: 'Invalid request parameters',
-          code: status,
-          details: data?.toString(),
-        ),
-      );
-    } else if (e.type == DioExceptionType.connectionTimeout) {
-      return Left(NetworkFailure(message: 'Connection timeout'));
-    } else if (e.type == DioExceptionType.receiveTimeout) {
-      return Left(NetworkFailure(message: 'Response timeout'));
-    }
-    return Left(
-      AIServiceFailure(
-        message: e.message ?? 'AI service error',
-        code: status,
-        details: data?.toString(),
-      ),
-    );
+    return searchResult.fold((failure) => Left(failure), (results) {
+      return Right({
+        'results': results,
+        'query': query,
+        'location': location,
+        'dateRange': dateRange,
+      });
+    });
   }
 }

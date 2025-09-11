@@ -23,9 +23,4 @@ abstract class AIServiceRepository {
     Itinerary? existingItinerary,
   });
   
-  Future<Either<Failure, Map<String, dynamic>>> searchWebInformation({
-    required String query,
-    String? location,
-    String? dateRange,
-  });
 }

@@ -1,28 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
 import '../../../domain/entities/chat_message.dart';
-import '../../providers/auth_provider.dart';
+import '../common/user_avatar.dart';
 
-class ChatMessageBubble extends ConsumerWidget {
+class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
 
   const ChatMessageBubble({super.key, required this.message});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref
-        .watch(authProvider)
-        .maybeWhen(authenticated: (user) => user, orElse: () => null);
-
-    final name = user?.displayName ?? (user?.email.split('@').first ?? 'T');
-    final avatarText = (name.isNotEmpty ? name[0] : 'T').toUpperCase();
-    final avatarUrl = user?.photoUrl;
-
+  Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: ScreenUtilHelper.spacing8),
       child: Row(
@@ -30,21 +21,7 @@ class ChatMessageBubble extends ConsumerWidget {
         children: [
           if (!message.isUser) ...[
             // AI Avatar
-            Container(
-              width: 32.w,
-              height: 32.w,
-              decoration: BoxDecoration(
-                color: AppColors.warning,
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.smart_toy,
-                  color: AppColors.white,
-                  size: 16.w,
-                ),
-              ),
-            ),
+            const AIAvatar(size: 32),
             SizedBox(width: ScreenUtilHelper.spacing8),
           ],
 
@@ -143,40 +120,9 @@ class ChatMessageBubble extends ConsumerWidget {
           if (message.isUser) ...[
             SizedBox(width: ScreenUtilHelper.spacing8),
             // User Avatar
-            Container(
-              width: 32.w,
-              height: 32.w,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              child: avatarUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(16.r),
-                      child: Image.network(
-                        avatarUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return _buildAvatarText(context, avatarText);
-                        },
-                      ),
-                    )
-                  : _buildAvatarText(context, avatarText),
-            ),
+            const UserAvatar(size: 32),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _buildAvatarText(BuildContext context, String text) {
-    return Center(
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: AppColors.onPrimary,
-          fontWeight: FontWeight.w600,
-        ),
       ),
     );
   }

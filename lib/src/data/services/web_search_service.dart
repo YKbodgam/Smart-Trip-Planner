@@ -1,245 +1,179 @@
-import 'package:dio/dio.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:dartz/dartz.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import '../../core/config/environment_config.dart';
 import '../../core/error/failures.dart';
 
 class WebSearchService {
-  final Dio _dio;
+  static const String _googleSearchBaseUrl = 'https://serpapi.com/search';
 
-  WebSearchService({Dio? dio}) : _dio = dio ?? Dio();
+  final http.Client _client;
 
-  Future<Either<Failure, List<SearchResult>>> searchRestaurants({
-    required String location,
-    String? cuisine,
-    String? priceRange,
-  }) async {
-    String query = 'best restaurants in $location';
-    if (cuisine != null) query += ' $cuisine cuisine';
-    if (priceRange != null) query += ' $priceRange';
+  WebSearchService({http.Client? client}) : _client = client ?? http.Client();
 
-    return _performSearch(query, 'restaurant');
-  }
+  // Get API key from .env file
+  String? get _apiKey => dotenv.env['SERP_API_KEY'];
 
-  Future<Either<Failure, List<SearchResult>>> searchHotels({
-    required String location,
-    String? budget,
-    String? type,
-  }) async {
-    String query = 'best hotels in $location';
-    if (budget != null) query += ' $budget budget';
-    if (type != null) query += ' $type';
+  // Check if service is configured
+  bool get isConfigured => _apiKey != null && _apiKey!.isNotEmpty;
 
-    return _performSearch(query, 'hotel');
-  }
-
-  Future<Either<Failure, List<SearchResult>>> searchAttractions({
-    required String location,
-    String? category,
-  }) async {
-    String query = 'top attractions things to do in $location';
-    if (category != null) query += ' $category';
-
-    return _performSearch(query, 'attraction');
-  }
-
-  Future<Either<Failure, List<SearchResult>>> searchTransportation({
-    required String from,
-    required String to,
-    String? mode,
-  }) async {
-    String query = 'transportation from $from to $to';
-    if (mode != null) query += ' $mode';
-
-    return _performSearch(query, 'transportation');
-  }
-
-  Future<Either<Failure, List<SearchResult>>> searchWeatherInfo({
-    required String location,
-    String? dateRange,
-  }) async {
-    String query = 'weather in $location';
-    if (dateRange != null) query += ' $dateRange';
-
-    return _performSearch(query, 'weather');
-  }
-
-  Future<Either<Failure, List<SearchResult>>> searchLocalEvents({
-    required String location,
-    String? dateRange,
-    String? eventType,
-  }) async {
-    String query = 'events in $location';
-    if (dateRange != null) query += ' $dateRange';
-    if (eventType != null) query += ' $eventType';
-
-    return _performSearch(query, 'event');
-  }
-
-  Future<Either<Failure, List<SearchResult>>> _performSearch(
+  // Search for web information
+  Future<Either<Failure, List<Map<String, dynamic>>>> search(
     String query,
-    String category,
   ) async {
-    try {
-      if (!EnvironmentConfig.isGoogleSearchConfigured) {
-        return Left(
-          ConfigurationFailure(message: 'Google Search API not configured'),
-        );
-      }
+    if (!isConfigured) {
+      return Left(
+        ConfigurationFailure(message: 'WebSearch API key is not configured'),
+      );
+    }
 
-      final response = await _dio.get(
-        'https://www.googleapis.com/customsearch/v1',
+    try {
+      final uri = Uri.parse(_googleSearchBaseUrl).replace(
         queryParameters: {
-          'key': EnvironmentConfig.googleSearchApiKey,
-          'cx': EnvironmentConfig.googleSearchEngineId,
+          'api_key': _apiKey,
           'q': query,
-          'num': 8, // Get more results for better variety
-          'safe': 'active',
+          'engine': 'google',
+          'hl': 'en',
+          'gl': 'us',
+          'num': '5', // Limit to 5 results for cost-efficiency
         },
       );
 
-      final items = response.data['items'] as List<dynamic>? ?? [];
-      final results = items
-          .map(
-            (item) => SearchResult(
-              title: item['title'] ?? '',
-              url: item['link'] ?? '',
-              snippet: item['snippet'] ?? '',
-              category: category,
-              displayLink: item['displayLink'] ?? '',
-              formattedUrl: item['formattedUrl'] ?? '',
-              imageUrl: item['pagemap']?['cse_image']?[0]?['src'],
-            ),
-          )
-          .toList();
+      final response = await _client.get(uri);
 
-      return Right(results);
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 403) {
+      if (response.statusCode == 200) {
+        final jsonData = jsonDecode(response.body);
+
+        // Extract organic search results
+        final organicResults = jsonData['organic_results'] as List<dynamic>?;
+        if (organicResults == null || organicResults.isEmpty) {
+          return const Right([]);
+        }
+
+        // Transform to simpler structure
+        final results = organicResults.map((result) {
+          return {
+            'title': result['title'],
+            'link': result['link'],
+            'snippet': result['snippet'],
+            'position': result['position'],
+            'displayed_link': result['displayed_link'],
+          };
+        }).toList();
+
+        return Right(List<Map<String, dynamic>>.from(results));
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
         return Left(
-          AuthenticationFailure(
-            message: 'Google Search API quota exceeded or invalid key',
+          AuthenticationFailure(message: 'Invalid WebSearch API key'),
+        );
+      } else if (response.statusCode == 429) {
+        return Left(
+          RateLimitFailure(message: 'WebSearch API rate limit exceeded'),
+        );
+      } else {
+        return Left(
+          NetworkFailure(
+            message: 'WebSearch API error: ${response.statusCode}',
           ),
         );
-      } else if (e.response?.statusCode == 400) {
-        return Left(ValidationFailure(message: 'Invalid search parameters'));
       }
-      return Left(NetworkFailure(message: e.message ?? 'Search API error'));
     } catch (e) {
+      debugPrint('WebSearch error: $e');
       return Left(UnknownFailure(message: e.toString()));
     }
   }
 
-  // Enhanced search with multiple queries for comprehensive results
-  Future<Either<Failure, Map<String, List<SearchResult>>>>
-  searchComprehensiveInfo({
-    required String location,
-    String? dateRange,
-    List<String>? interests,
-  }) async {
-    final results = <String, List<SearchResult>>{};
-
+  // Alternative search using mock data for testing or when API is not configured
+  Future<Either<Failure, List<Map<String, dynamic>>>> mockSearch(
+    String query,
+  ) async {
     try {
-      // Search for restaurants
-      final restaurantsResult = await searchRestaurants(location: location);
-      restaurantsResult.fold(
-        (failure) => results['restaurants'] = [],
-        (searchResults) => results['restaurants'] = searchResults,
-      );
+      // Simulate network delay
+      await Future.delayed(const Duration(milliseconds: 800));
 
-      // Search for attractions
-      final attractionsResult = await searchAttractions(location: location);
-      attractionsResult.fold(
-        (failure) => results['attractions'] = [],
-        (searchResults) => results['attractions'] = searchResults,
-      );
-
-      // Search for hotels
-      final hotelsResult = await searchHotels(location: location);
-      hotelsResult.fold(
-        (failure) => results['hotels'] = [],
-        (searchResults) => results['hotels'] = searchResults,
-      );
-
-      // Search for weather info
-      final weatherResult = await searchWeatherInfo(
-        location: location,
-        dateRange: dateRange,
-      );
-      weatherResult.fold(
-        (failure) => results['weather'] = [],
-        (searchResults) => results['weather'] = searchResults,
-      );
-
-      // Search for local events if date range is provided
-      if (dateRange != null) {
-        final eventsResult = await searchLocalEvents(
-          location: location,
-          dateRange: dateRange,
-        );
-        eventsResult.fold(
-          (failure) => results['events'] = [],
-          (searchResults) => results['events'] = searchResults,
-        );
-      }
-
-      // Search for specific interests
-      if (interests != null && interests.isNotEmpty) {
-        for (final interest in interests) {
-          final interestResult = await _performSearch(
-            '$interest in $location',
-            'interest',
-          );
-          interestResult.fold(
-            (failure) => results[interest] = [],
-            (searchResults) => results[interest] = searchResults,
-          );
-        }
-      }
+      // Create mock results based on query
+      final results = [
+        {
+          'title': 'Top ${query.split(' ').last} Information',
+          'link': 'https://example.com/search?q=$query',
+          'snippet':
+              'This is a sample result about $query with relevant information that would be useful for travel planning.',
+          'position': 1,
+          'displayed_link': 'example.com',
+        },
+        {
+          'title': 'Best places to visit in ${query.split(' ').last}',
+          'link': 'https://travel.example.com/destinations/$query',
+          'snippet':
+              'Discover the most popular attractions and hidden gems in ${query.split(' ').last}. Plan your perfect trip with our comprehensive guide.',
+          'position': 2,
+          'displayed_link': 'travel.example.com',
+        },
+      ];
 
       return Right(results);
     } catch (e) {
       return Left(UnknownFailure(message: e.toString()));
     }
   }
-}
 
-class SearchResult {
-  final String title;
-  final String url;
-  final String snippet;
-  final String category;
-  final String displayLink;
-  final String formattedUrl;
-  final String? imageUrl;
+  // Search with fallback to mock data
+  Future<Either<Failure, List<Map<String, dynamic>>>> searchWithFallback(
+    String query,
+  ) async {
+    if (isConfigured) {
+      final result = await search(query);
+      if (result.isRight()) {
+        return result;
+      }
+      // If the real search fails for any reason, try mock search
+      return mockSearch(query);
+    } else {
+      // If not configured, use mock data
+      return mockSearch(query);
+    }
+  }
 
-  const SearchResult({
-    required this.title,
-    required this.url,
-    required this.snippet,
-    required this.category,
-    required this.displayLink,
-    required this.formattedUrl,
-    this.imageUrl,
-  });
+  // Generate search queries based on itinerary details
+  List<String> generateSearchQueries(Map<String, dynamic> itineraryData) {
+    final queries = <String>[];
 
-  Map<String, dynamic> toJson() => {
-    'title': title,
-    'url': url,
-    'snippet': snippet,
-    'category': category,
-    'displayLink': displayLink,
-    'formattedUrl': formattedUrl,
-    'imageUrl': imageUrl,
-  };
+    // Extract destination from title
+    final title = itineraryData['title'] as String?;
+    if (title != null) {
+      final destination = title.replaceAll('Trip to ', '');
+      queries.add('Top attractions in $destination');
+      queries.add('Best restaurants in $destination');
+    }
 
-  factory SearchResult.fromJson(Map<String, dynamic> json) => SearchResult(
-    title: json['title'] ?? '',
-    url: json['url'] ?? '',
-    snippet: json['snippet'] ?? '',
-    category: json['category'] ?? '',
-    displayLink: json['displayLink'] ?? '',
-    formattedUrl: json['formattedUrl'] ?? '',
-    imageUrl: json['imageUrl'],
-  );
+    // Extract specific locations from days
+    final days = itineraryData['days'] as List<dynamic>?;
+    if (days != null && days.isNotEmpty) {
+      for (final day in days) {
+        final items = day['items'] as List<dynamic>?;
+        if (items != null) {
+          for (final item in items) {
+            final location = item['location'] as String?;
+            final activity = item['activity'] as String?;
+
+            if (location != null && location.isNotEmpty) {
+              queries.add('Information about $location');
+            }
+
+            if (activity != null &&
+                (activity.contains('restaurant') ||
+                    activity.contains('café') ||
+                    activity.contains('cafe'))) {
+              queries.add('Reviews for $activity $location');
+            }
+          }
+        }
+      }
+    }
+
+    // Limit to 5 unique queries
+    return queries.toSet().take(5).toList();
+  }
 }
