@@ -1,26 +1,13 @@
 # 🗺️ Pathoria - AI-Powered Smart Trip Planner
 
 <div align="center">
-  <img src="assets/images/identification/app_icon_foreground.png" alt="Pathoria App Banner" width="800"/>
+  <img src="assets/images/identification/app_icon_foreground.png" alt="Pathoria App Banner" width="200"/>
 </div>
 
 <div align="center">
   
-  [![Flutter](https://img.shields.io/badge/Flutter-3.19.0+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flu## 🔮 Future Development
-
-### Near-Term Roadmap
-- **Enhanced AI Prompting** - More specific and context-aware travel planning capabilities
-- **Predictive Recommendations** - Suggesting activities based on user preferences and history
-- **Alternative AI Models** - Support for multiple LLM providers with fallback options
-- **Voice Interface** - Hands-free trip planning through voice commands
-- **Image Recognition** - Identify landmarks and points of interest from photos
-
-### Long-Term Vision
-- **Multimodal Planning** - Integrated flight, hotel, and activity booking
-- **Personalized Recommendations** - Machine learning-based suggestion engine
-- **Social Features** - Community sharing of trip plans and recommendations
-- **Enterprise Solutions** - White-label version for travel industry partners
-- **Hybrid AI Approach** - Combination of specialized travel models with general LLMs for optimal results[![Dart](https://img.shields.io/badge/Dart-3.3.0+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
+  [![Flutter](https://img.shields.io/badge/Flutter-3.19.0+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://docs.flutter.dev/)
+  [![Dart](https://img.shields.io/badge/Dart-3.3.0+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
   [![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
   [![AI Powered](https://img.shields.io/badge/AI_Powered-8A2BE2?style=for-the-badge&logo=ai&logoColor=white)](https://developers.google.com/custom-search)
   [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
@@ -33,8 +20,12 @@
   <table>
     <tr>
       <td><img src="assets\images\inspiration\home.png" alt="Search Interface" width="250"/></td>
-      <td><img src="assets\images\inspiration\itinerary.png" alt="Trip Details" width="250"/></td>
-      <td><img src="assets\images\inspiration\followup.png" alt="Chat Interface" width="250"/></td>
+      <td><img src="assets\images\inspiration\thinking.png" alt="Trip Details" width="250"/></td>
+      <td><img src="assets\images\inspiration\itinerary.png" alt="Chat Interface" width="250"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets\images\inspiration\followup.png" alt="Search Interface" width="250"/></td>
+      <td><img src="assets\images\inspiration\limit.png" alt="Chat Interface" width="250" height="380"/></td>
     </tr>
     <tr>
       <td align="center"><b>AI Search Interface</b></td>
@@ -82,10 +73,24 @@ The chat-based interface provides:
 - **Real-time updates and changes** as travel plans evolve
 - **Offline access** to saved itineraries for travel without connectivity
 
-<div align="center">
+### Near-Term Roadmap
+- **Enhanced AI Prompting** - More specific and context-aware travel planning capabilities
+- **Predictive Recommendations** - Suggesting activities based on user preferences and history
+- **Alternative AI Models** - Support for multiple LLM providers with fallback options
+- **Voice Interface** - Hands-free trip planning through voice commands
+- **Image Recognition** - Identify landmarks and points of interest from photos
+
+### Long-Term Vision
+- **Multimodal Planning** - Integrated flight, hotel, and activity booking
+- **Personalized Recommendations** - Machine learning-based suggestion engine
+- **Social Features** - Community sharing of trip plans and recommendations
+- **Enterprise Solutions** - White-label version for travel industry partners
+- **Hybrid AI Approach** - Combination of specialized travel models with general LLMs for optimal results
+
+<!-- <div align="center">
   <img src="assets\images\inspiration\chat.png" alt="AI Conversation Flow" width="600"/>
   <p><i>Pathoria's intelligent conversation flow adapts to user inputs and preferences</i></p>
-</div>
+</div> -->
 
 ## ✨ Key Features
 
@@ -105,11 +110,11 @@ The chat-based interface provides:
 - **Visual Trip Timeline** - Interactive day-by-day view of planned activities
 - **Smart Notifications** - Context-aware alerts about reservations and activities
 - **Share & Collaborate** - Trip sharing with co-travelers for collaborative planning
-
+<!-- 
 <div align="center">
   <img src="assets\images\inspiration\thinking.png" alt="Feature Showcase" width="600"/>
   <p><i>Pathoria's AI-powered search interface delivers personalized travel recommendations</i></p>
-</div>
+</div> -->
 
 ## 🏗️ Architecture & Technical Implementation
 
@@ -351,10 +356,7 @@ Our comprehensive testing strategy ensures reliability and performance:
 
 ## 📚 Documentation & Resources
 
-- [📖 API Documentation](documentation/API_DOCUMENTATION.md) - Detailed API integration guides
-- [🏗️ Architecture Guide](documentation/ARCHITECTURE.md) - In-depth architectural decisions
-- [🤝 Contributing Guide](documentation/CONTRIBUTING.md) - Guidelines for contributors
-- [📋 Project Analysis](documentation/PROJECT_ANALYSIS.md) - Performance and usability insights
+- [📖 APP Documentation](docs/documentation.md) - Detailed API integration guides
 
 ## � Future Development
 
@@ -393,7 +395,7 @@ This project follows standard GitHub flow:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-Please read our [Contributing Guide](documentation/CONTRIBUTING.md) for details on our code standards.
+Please read our [Contributing Guide](docs/contributing.md) for details on our code standards.
 
 ## 📄 License
 
