@@ -73,7 +73,7 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   }
 
   @override
-  Future<Either<Failure, Itinerary?>> getItineraryById(int id) async {
+  Future<Either<Failure, Itinerary?>> getItineraryById(String id) async {
     try {
       // Try local first
       final localItinerary = _hiveService.itinerariesBox.get(id);
@@ -128,7 +128,7 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteItinerary(int? id) async {
+  Future<Either<Failure, void>> deleteItinerary(String id) async {
     try {
       // Delete locally
       await _hiveService.itinerariesBox.delete(id);
@@ -136,7 +136,8 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
       // If online, delete from cloud
       if (await _isOnline()) {
         final userId = await _getCurrentUserId();
-        if (userId != null && id != null) {
+
+        if (userId != null) {
           await _firestoreService.deleteItinerary(userId, id.toString());
         }
       }
@@ -196,7 +197,7 @@ class ItineraryRepositoryImpl implements ItineraryRepository {
   }
 
   @override
-  Future<Either<Failure, void>> markItineraryOffline(int? id) async {
+  Future<Either<Failure, void>> markItineraryOffline(String id) async {
     try {
       final itinerary = _hiveService.itinerariesBox.get(id);
       if (itinerary != null) {

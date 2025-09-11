@@ -64,6 +64,21 @@ class Itinerary extends Equatable {
     totalCost,
     currency,
   ];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'startDate': startDate,
+      'endDate': endDate,
+      'days': days.map((day) => day.toJson()).toList(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'isOfflineAvailable': isOfflineAvailable,
+      'totalCost': totalCost,
+      'currency': currency,
+    };
+  }
 }
 
 class ItineraryDay extends Equatable {
@@ -91,6 +106,14 @@ class ItineraryDay extends Equatable {
 
   @override
   List<Object?> get props => [date, summary, items];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'date': date,
+      'summary': summary,
+      'items': items.map((item) => item.toJson()).toList(),
+    };
+  }
 }
 
 class ItineraryItem extends Equatable {
@@ -137,4 +160,15 @@ class ItineraryItem extends Equatable {
     estimatedCost,
     category,
   ];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'time': time,
+      'activity': activity,
+      'location': location,
+      'description': description,
+      'estimatedCost': estimatedCost,
+      'category': category,
+    };
+  }
 }

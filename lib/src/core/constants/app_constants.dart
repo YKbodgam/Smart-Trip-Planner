@@ -1,17 +1,29 @@
+import '../config/app_environment.dart';
+
 class AppConstants {
   // App Information
-  static const String appName = 'Smart Trip Planner';
+  static const String appName = 'Itinerary AI';
   static const String appVersion = '1.0.0';
   static const String appDescription = 'AI-powered travel itinerary planner';
 
   // API Constants
-  static const String openAIBaseUrl = 'https://api.openai.com/v1';
-  static const String geminiBaseUrl =
-      'https://generativelanguage.googleapis.com/v1beta';
+  static const String groqApiBaseUrl = 'https://api.groq.com/v1';
+  static final String groqApiKeyHeader =
+      'Authorization: Bearer ${AppEnvironmentConfig.groqApiKey}';
 
-  // Database Constants
-  static const String databaseName = 'smart_trip_planner.db';
-  static const int databaseVersion = 1;
+  static const String groqModel = 'gpt-4o';
+  static const String groqChatEndpoint = '/chat/completions';
+  static const String groqCompletionEndpoint = '/completions';
+  static const String groqSearchEndpoint = '/search';
+  static const String groqEmbeddingEndpoint = '/embeddings';
+  static const String groqModerationEndpoint = '/moderations';
+  static const String groqUsageEndpoint = '/usage';
+  static const String groqBillingEndpoint = '/billing';
+  static const String groqDefaultTemperature = '0.7';
+  static const String groqDefaultMaxTokens = '1500';
+  static const String groqDefaultTopP = '1.0';
+  static const String groqDefaultFrequencyPenalty = '0.0';
+  static const String groqDefaultPresencePenalty = '0.0';
 
   // Storage Keys
   static const String userTokenKey = 'user_token';

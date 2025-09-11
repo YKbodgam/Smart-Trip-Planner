@@ -43,9 +43,7 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
       }
 
       final repository = ref.read(itineraryRepositoryProvider);
-      final result = await repository.getItineraryById(
-        int.parse(widget.itineraryId),
-      );
+      final result = await repository.getItineraryById(widget.itineraryId);
 
       result.fold((failure) => throw Exception(failure.message), (itinerary) {
         if (mounted) {
@@ -111,9 +109,7 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
 
     try {
       final repository = ref.read(itineraryRepositoryProvider);
-      final result = await repository.markItineraryOffline(
-        int.parse(widget.itineraryId),
-      );
+      final result = await repository.markItineraryOffline(widget.itineraryId);
 
       result.fold((failure) => throw Exception(failure.message), (_) {
         if (mounted) {
@@ -203,13 +199,14 @@ class _ItineraryDetailScreenState extends ConsumerState<ItineraryDetailScreen> {
         actions: [
           Consumer(
             builder: (context, ref, _) {
-              final user = ref.watch(authProvider).maybeWhen(
-                    authenticated: (user) => user,
-                    orElse: () => null,
-                  );
-              
-              final name = user?.displayName ?? (user?.email.split('@').first ?? 'T');
-              final avatarText = (name.isNotEmpty ? name[0] : 'T').toUpperCase();
+              final user = ref
+                  .watch(authProvider)
+                  .maybeWhen(authenticated: (user) => user, orElse: () => null);
+
+              final name =
+                  user?.displayName ?? (user?.email.split('@').first ?? 'T');
+              final avatarText = (name.isNotEmpty ? name[0] : 'T')
+                  .toUpperCase();
               final avatarUrl = user?.photoUrl;
 
               return Container(

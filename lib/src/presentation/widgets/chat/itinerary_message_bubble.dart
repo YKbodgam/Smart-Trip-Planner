@@ -6,7 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
 import '../../../domain/entities/itinerary.dart';
-import '../../../data/services/web_search_service.dart';
+import '../../../domain/entities/search_result.dart';
+import '../common/user_avatar.dart';
 
 class GoogleSearchResultsBubble extends StatelessWidget {
   final List<SearchResult> results;
@@ -38,46 +39,49 @@ class GoogleSearchResultsBubble extends StatelessWidget {
                 Text(
                   'Google Search Results',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.blueGrey,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    color: Colors.blueGrey,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 8),
-                ...results.map((result) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          GestureDetector(
-                            onTap: () async {
-                              final url = Uri.parse(result.url);
-                              if (await canLaunchUrl(url)) {
-                                await launchUrl(url);
-                              }
-                            },
-                            child: Text(
-                              result.title,
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: Colors.blue,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            result.snippet,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            result.displayLink,
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: Colors.grey,
+                ...results.map(
+                  (result) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: () async {
+                            final url = Uri.parse(result.url);
+                            if (await canLaunchUrl(url)) {
+                              await launchUrl(url);
+                            }
+                          },
+                          child: Text(
+                            result.title,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  color: Colors.blue,
+                                  decoration: TextDecoration.underline,
                                 ),
                           ),
-                        ],
-                      ),
-                    )),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          result.snippet,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          result.displayLink,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.labelSmall?.copyWith(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -126,17 +130,7 @@ class ItineraryMessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // AI Avatar
-          Container(
-            width: 32.w,
-            height: 32.w,
-            decoration: BoxDecoration(
-              color: AppColors.warning,
-              borderRadius: BorderRadius.circular(16.r),
-            ),
-            child: Center(
-              child: Icon(Icons.smart_toy, color: AppColors.white, size: 16.w),
-            ),
-          ),
+          const AIAvatar(size: 32),
 
           SizedBox(width: ScreenUtilHelper.spacing8),
 
@@ -383,7 +377,20 @@ class ItineraryMessageBubble extends StatelessWidget {
 
                     TextButton.icon(
                       onPressed: () {
-                        // TODO: Regenerate itinerary
+                        // Pass the event to the parent through the callback
+                        if (onFollowUp != null) {
+                          onFollowUp!();
+                        } else {
+                          // Fallback - show a snackbar
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Regenerate functionality not implemented',
+                              ),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
                       },
                       icon: Icon(
                         Icons.refresh_outlined,

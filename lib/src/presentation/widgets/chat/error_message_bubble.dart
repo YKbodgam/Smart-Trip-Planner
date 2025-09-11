@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_util_helper.dart';
+import '../common/user_avatar.dart';
+import '../common/feedback_widgets.dart';
 
 class ErrorMessageBubble extends StatelessWidget {
   final String message;
@@ -22,18 +23,7 @@ class ErrorMessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // AI Avatar
-          Container(
-            width: 32.w,
-            height: 32.w,
-            decoration: BoxDecoration(
-              color: AppColors.warning,
-              borderRadius: BorderRadius.circular(16.r),
-            ),
-            child: Center(
-              child: Icon(Icons.smart_toy, color: AppColors.white, size: 16.w),
-            ),
-          ),
-
+          const AIAvatar(size: 32),
           SizedBox(width: ScreenUtilHelper.spacing8),
 
           Expanded(
@@ -52,71 +42,12 @@ class ErrorMessageBubble extends StatelessWidget {
                   ),
                 ),
 
-                // Error Bubble
-                Container(
-                  padding: EdgeInsets.all(ScreenUtilHelper.spacing16),
-                  decoration: BoxDecoration(
-                    color: AppColors.errorContainer.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(
-                      ScreenUtilHelper.radius16,
-                    ),
-                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Error Icon and Message
-                      Row(
-                        children: [
-                          Container(
-                            width: 8.w,
-                            height: 8.w,
-                            decoration: BoxDecoration(
-                              color: AppColors.error,
-                              borderRadius: BorderRadius.circular(4.r),
-                            ),
-                          ),
-
-                          SizedBox(width: ScreenUtilHelper.spacing8),
-
-                          Expanded(
-                            child: Text(
-                              message,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: AppColors.error),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      if (onRegenerate != null) ...[
-                        SizedBox(height: ScreenUtilHelper.spacing12),
-
-                        // Regenerate Button
-                        TextButton.icon(
-                          onPressed: onRegenerate,
-                          icon: Icon(
-                            Icons.refresh,
-                            size: 16.w,
-                            color: AppColors.primary,
-                          ),
-                          label: Text(
-                            'Regenerate',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: AppColors.primary),
-                          ),
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: ScreenUtilHelper.spacing8,
-                              vertical: ScreenUtilHelper.spacing4,
-                            ),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                // Error Display
+                ErrorDisplay(
+                  message: message,
+                  onRetry: onRegenerate,
+                  compact: true,
+                  icon: Icons.warning_amber_rounded,
                 ),
               ],
             ),

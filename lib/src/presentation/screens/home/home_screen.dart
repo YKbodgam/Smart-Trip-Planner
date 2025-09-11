@@ -224,36 +224,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             return Column(
               children: userPrompts
                   .map(
-                    (m) => Container(
-                      margin: EdgeInsets.only(
-                        bottom: ScreenUtilHelper.spacing8,
-                      ),
-                      padding: EdgeInsets.all(ScreenUtilHelper.spacing12),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(
-                          ScreenUtilHelper.radius12,
+                    (m) => GestureDetector(
+                      onTap: () {
+                        // Navigate to chat with the message content
+                        context.go('/home/chat?prompt=${Uri.encodeComponent(m.content)}');
+                      },
+                      child: Container(
+                        margin: EdgeInsets.only(
+                          bottom: ScreenUtilHelper.spacing8,
                         ),
-                        border: Border.all(
-                          color: AppColors.outline.withOpacity(0.2),
+                        padding: EdgeInsets.all(ScreenUtilHelper.spacing12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(
+                            ScreenUtilHelper.radius12,
+                          ),
+                          border: Border.all(
+                            color: AppColors.outline.withOpacity(0.2),
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              m.content,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: AppColors.onSurface),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                m.content,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: AppColors.onSurface),
+                              ),
                             ),
-                          ),
-                          Icon(
-                            Icons.chevron_right,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ],
+                            Icon(
+                              Icons.chevron_right,
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   )

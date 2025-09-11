@@ -17,7 +17,7 @@ final itineraryDetailProvider =
       String
     >((ref, id) {
       final repository = ref.watch(itineraryRepositoryProvider);
-      return ItineraryDetailNotifier(repository, int.tryParse(id) ?? 0);
+      return ItineraryDetailNotifier(repository, id);
     });
 
 class ItineraryListNotifier extends StateNotifier<ItineraryListState> {
@@ -60,7 +60,7 @@ class ItineraryListNotifier extends StateNotifier<ItineraryListState> {
   }
 
   Future<void> deleteItinerary(String id) async {
-    final result = await _repository.deleteItinerary(int.tryParse(id) ?? 0);
+    final result = await _repository.deleteItinerary(id);
     result.fold(
       (failure) => state = ItineraryListState.error(failure.message),
       (_) {
@@ -71,7 +71,7 @@ class ItineraryListNotifier extends StateNotifier<ItineraryListState> {
   }
 
   Future<void> markOffline(String id) async {
-    final result = await _repository.markItineraryOffline(int.tryParse(id) ?? 0);
+    final result = await _repository.markItineraryOffline(id);
     result.fold(
       (failure) => state = ItineraryListState.error(failure.message),
       (_) {
@@ -84,7 +84,7 @@ class ItineraryListNotifier extends StateNotifier<ItineraryListState> {
 
 class ItineraryDetailNotifier extends StateNotifier<ItineraryDetailState> {
   final ItineraryRepository _repository;
-  final int _itineraryId;
+  final String _itineraryId;
 
   ItineraryDetailNotifier(this._repository, this._itineraryId)
     : super(const ItineraryDetailState.loading()) {
